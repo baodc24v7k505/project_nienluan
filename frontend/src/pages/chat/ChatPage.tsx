@@ -1,0 +1,169 @@
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getMessages, getOrCreateConversation, listMyConversations, sendMessage } from '../../api/chat';
+import { getSocket } from '../../realtime/socket';
+import { useAuthStore } from '../../store/auth.store';
+import type { Message } from '../../types/chat';
+
+function conversationLabel(
+  conv: { type: string; customer: { fullName: string }; shop: { name: string } | null },
+  currentRole: string,
+): string {
+  if (conv.type === 'SUPPORT') {
+    return currentRole === 'CUSTOMER' ? 'Hỗ trợ từ Sàn TMĐT' : `Hỗ trợ: ${conv.customer.fullName}`;
+  }
+  if (currentRole === 'SELLER') return conv.customer.fullName;
+  return conv.shop?.name ?? 'Shop';
+}
+
+export function ChatPage() {
+  const [searchParams] = useSearchParams();
+  const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
+  const [selectedId, setSelectedId] = useState<string | null>(
+    searchParams.get('conversationId'),
+  );
+  const [draft, setDraft] = useState('');
+
+  const { data: conversations } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: listMyConversations,
+    refetchInterval: 15_000,
+  });
+
+  const { data: messages } = useQuery({
+    queryKey: ['messages', selectedId],
+    queryFn: () => getMessages(selectedId!),
+    enabled: !!selectedId,
+  });
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    socket.emit('conversation:join', { conversationId: selectedId });
+
+    const handleNewMessage = (msg: Message) => {
+      if (msg.conversationId !== selectedId) return;
+      queryClient.setQueryData<Message[]>(['messages', selectedId], (old) =>
+        old ? [...old, msg] : [msg],
+      );
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    };
+
+    socket.on('message:new', handleNewMessage);
+
+    return () => {
+      socket.emit('conversation:leave', { conversationId: selectedId });
+      socket.off('message:new', handleNewMessage);
+    };
+  }, [selectedId, queryClient]);
+
+  const sendMutation = useMutation({
+    mutationFn: (body: string) => sendMessage(selectedId!, body),
+    onSuccess: () => setDraft(''),
+  });
+
+  const startSupportMutation = useMutation({
+    mutationFn: () => getOrCreateConversation('SUPPORT'),
+    onSuccess: (conv) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      setSelectedId(conv.id);
+    },
+  });
+
+  function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft.trim() || !selectedId) return;
+    sendMutation.mutate(draft.trim());
+  }
+
+  if (!user) return null;
+
+  return (
+    <div className="grid h-[70vh] grid-cols-1 gap-4 md:grid-cols-[280px_1fr]">
+      <div className="overflow-y-auto rounded-lg border border-slate-200 bg-white">
+        {user.role === 'CUSTOMER' && (
+          <button
+            onClick={() => startSupportMutation.mutate()}
+            disabled={startSupportMutation.isPending}
+            className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm text-brand hover:bg-brand-bg"
+          >
+            + Chat với hỗ trợ
+          </button>
+        )}
+        {conversations?.length === 0 && (
+          <p className="p-4 text-center text-sm text-slate-400">Chưa có cuộc trò chuyện nào</p>
+        )}
+        {conversations?.map((conv) => (
+          <button
+            key={conv.id}
+            onClick={() => setSelectedId(conv.id)}
+            className={`block w-full border-b border-slate-100 px-3 py-3 text-left text-sm hover:bg-slate-50 ${
+              selectedId === conv.id ? 'bg-brand-bg' : ''
+            }`}
+          >
+            <p className="font-medium text-slate-900">{conversationLabel(conv, user.role)}</p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">
+              {conv.messages[0]?.body ?? 'Chưa có tin nhắn'}
+            </p>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-col rounded-lg border border-slate-200 bg-white">
+        {!selectedId ? (
+          <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
+            Chọn một cuộc trò chuyện để bắt đầu
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="flex flex-col gap-2">
+                {messages?.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+                      m.senderId === user.id
+                        ? 'ml-auto bg-brand text-white'
+                        : 'bg-slate-100 text-slate-800'
+                    }`}
+                  >
+                    <p>{m.body}</p>
+                    <p
+                      className={`mt-1 text-[10px] ${
+                        m.senderId === user.id ? 'text-white/70' : 'text-slate-400'
+                      }`}
+                    >
+                      {new Date(m.createdAt).toLocaleTimeString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <form onSubmit={handleSend} className="flex gap-2 border-t border-slate-100 p-3">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Nhập tin nhắn..."
+                className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={sendMutation.isPending}
+                className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+              >
+                Gửi
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
