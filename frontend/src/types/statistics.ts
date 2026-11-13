@@ -14,6 +14,7 @@ export interface VoucherStat {
 }
 
 export interface SellerStatistics {
+  range: { from: string; to: string };
   totalCollected: number;
   totalRefunded: number;
   grossMerchandiseValue: number;
@@ -33,6 +34,8 @@ export interface SellerStatistics {
 }
 
 export interface AdminStatistics {
+  range: { from: string; to: string };
+  ordersByStatus: Record<string, number>;
   totalCollected: number;
   totalRefunded: number;
   grossMerchandiseValue: number;

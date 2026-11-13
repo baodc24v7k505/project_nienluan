@@ -685,6 +685,131 @@ describe('Commerce integration with PostgreSQL', () => {
     const settled = await call('admin', 'get', '/admin/statistics').expect(200);
     expect(settled.body.totalRevenue).toBe(before.body.totalRevenue);
   });
+  it('protects advertisement deletion requests and lets owners cancel or resubmit', async () => {
+    const response = await call('seller', 'post', '/seller/ads')
+      .send({
+        title: `Campaign ${tag}`,
+        imageUrl: 'https://example.com/banner.jpg',
+        startAt: new Date(Date.now() - 60000).toISOString(),
+        endAt: new Date(Date.now() + 86400000).toISOString(),
+      })
+      .expect(201);
+    const id = response.body.id;
+    await call('admin', 'patch', `/admin/ads/${id}/status`)
+      .send({ status: 'APPROVED' })
+      .expect(200);
+    await call('seller2', 'post', `/seller/ads/${id}/deletion-request`)
+      .send({ reason: 'Not my campaign' })
+      .expect(404);
+    await call('seller', 'post', `/seller/ads/${id}/deletion-request`)
+      .send({ reason: '     ' })
+      .expect(400);
+    await call('seller', 'post', `/seller/ads/${id}/deletion-request`)
+      .send({ reason: '  Campaign has ended  ' })
+      .expect(201);
+    await call('seller', 'post', `/seller/ads/${id}/deletion-request`)
+      .send({ reason: 'Another request' })
+      .expect(409);
+    await call(
+      'seller2',
+      'delete',
+      `/seller/ads/${id}/deletion-request`,
+    ).expect(404);
+    await call('staff', 'delete', `/admin/ads/${id}`).expect(403);
+    await call('staff', 'patch', `/admin/ads/${id}/deletion-request`)
+      .send({ note: 'Not authorized' })
+      .expect(403);
+    await call('admin', 'patch', `/admin/ads/${id}/status`)
+      .send({ status: 'REJECTED' })
+      .expect(409);
+    const pending = await call(
+      'admin',
+      'get',
+      `/admin/ads?deletionRequested=true&status=APPROVED&search=${tag}&pageSize=1`,
+    ).expect(200);
+    expect(pending.body.total).toBe(1);
+    expect(pending.body.items[0].deletionReason).toBe('Campaign has ended');
+    const active = await request(app.getHttpServer())
+      .get('/api/ads/active')
+      .expect(200);
+    expect(active.body.some((ad: any) => ad.id === id)).toBe(true);
+    await call('admin', 'patch', `/admin/ads/${id}/deletion-request`)
+      .send({ note: 'Please confirm campaign dates' })
+      .expect(200);
+    const rejected = await db.advertisement.findUniqueOrThrow({
+      where: { id },
+    });
+    expect(rejected.deletionRequestedAt).toBeNull();
+    expect(rejected.deletionReviewNote).toBe('Please confirm campaign dates');
+    expect(rejected.status).toBe('APPROVED');
+    await call('seller', 'post', `/seller/ads/${id}/deletion-request`)
+      .send({ reason: 'Confirmed end of campaign' })
+      .expect(201);
+    await call('seller', 'delete', `/seller/ads/${id}/deletion-request`).expect(
+      200,
+    );
+    expect(
+      (await db.advertisement.findUniqueOrThrow({ where: { id } }))
+        .deletionRequestedAt,
+    ).toBeNull();
+    await call('seller', 'post', `/seller/ads/${id}/deletion-request`)
+      .send({ reason: 'Ready to remove this banner' })
+      .expect(201);
+    await call('admin', 'delete', `/admin/ads/${id}`).expect(200);
+    expect(
+      (await db.advertisement.findUniqueOrThrow({ where: { id } })).deletedAt,
+    ).not.toBeNull();
+    expect(
+      (await call('admin', 'get', `/admin/ads?search=${tag}`).expect(200)).body
+        .items,
+    ).toHaveLength(0);
+    expect(
+      (await call('seller', 'get', '/seller/ads').expect(200)).body.items.some(
+        (ad: any) => ad.id === id,
+      ),
+    ).toBe(false);
+    expect(
+      (
+        await request(app.getHttpServer()).get('/api/ads/active').expect(200)
+      ).body.some((ad: any) => ad.id === id),
+    ).toBe(false);
+    await call('admin', 'delete', `/admin/ads/${id}`).expect(404);
+    await call('admin', 'patch', `/admin/ads/${id}/status`)
+      .send({ status: 'APPROVED' })
+      .expect(404);
+    await call('seller', 'post', `/seller/ads/${id}/deletion-request`)
+      .send({ reason: 'Cannot revive this ad' })
+      .expect(404);
+  });
+  it('lets ADMIN remove an advertisement directly and hides suspended-shop banners', async () => {
+    const ad = await db.advertisement.create({
+      data: {
+        shopId: secondShop,
+        title: 'Direct removal',
+        imageUrl: 'https://example.com/ad.jpg',
+        status: 'APPROVED',
+        startAt: new Date(Date.now() - 1000),
+        endAt: new Date(Date.now() + 86400000),
+      },
+    });
+    await db.shop.update({
+      where: { id: secondShop },
+      data: { status: 'SUSPENDED' },
+    });
+    const active = await request(app.getHttpServer())
+      .get('/api/ads/active')
+      .expect(200);
+    expect(active.body.some((a: any) => a.id === ad.id)).toBe(false);
+    await db.shop.update({
+      where: { id: secondShop },
+      data: { status: 'APPROVED' },
+    });
+    await call('admin', 'delete', `/admin/ads/${ad.id}`).expect(200);
+    expect(
+      (await db.advertisement.findUniqueOrThrow({ where: { id: ad.id } }))
+        .deletedAt,
+    ).not.toBeNull();
+  });
   it('invalidates old access tokens after a password change', async () => {
     await call('customer', 'post', '/auth/password')
       .send({ currentPassword: 'password123', newPassword: 'newPassword123' })

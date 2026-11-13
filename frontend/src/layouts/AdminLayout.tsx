@@ -1,47 +1,24 @@
-import { NavLink, Outlet } from "react-router-dom";
 import { useAuthStore } from "../store/auth.store";
-
-const tabs = [
-  { to: "/admin", label: "Tổng quan", end: true },
-  { to: "/admin/users", label: "Người dùng" },
-  { to: "/admin/staff", label: "Nhân viên" },
-  { to: "/admin/shops", label: "Shop" },
-  { to: "/admin/categories", label: "Danh mục" },
-  { to: "/admin/products", label: "Sản phẩm" },
-  { to: "/admin/orders", label: "Đơn hàng" },
-  { to: "/admin/vouchers", label: "Voucher" },
-  { to: "/admin/ads", label: "Quảng cáo" },
-  { to: "/admin/chat", label: "Hỗ trợ" },
+import { WorkspaceLayout, type WorkspaceTab } from "./WorkspaceLayout";
+const tabs: WorkspaceTab[] = [
+  { to: "/admin", label: "Báo cáo tổng quan", icon: "fa-chart-pie", end: true },
+  { to: "/admin/orders", label: "Đơn hàng", icon: "fa-box" },
+  { to: "/admin/products", label: "Sản phẩm", icon: "fa-cubes" },
+  { to: "/admin/shops", label: "Gian hàng", icon: "fa-store" },
+  { to: "/admin/categories", label: "Danh mục", icon: "fa-layer-group" },
+  { to: "/admin/users", label: "Người dùng", icon: "fa-users" },
+  { to: "/admin/staff", label: "Nhân viên", icon: "fa-user-shield" },
+  { to: "/admin/vouchers", label: "Mã giảm giá", icon: "fa-ticket" },
+  { to: "/admin/ads", label: "Quảng cáo", icon: "fa-bullhorn" },
+  { to: "/admin/chat", label: "Hỗ trợ", icon: "fa-headset" },
 ];
-
 export function AdminLayout() {
   const role = useAuthStore((s) => s.user?.role);
   return (
-    <div>
-      <h1 className="mb-4 text-2xl font-semibold text-slate-900">
-        Trang quản trị
-      </h1>
-      <div className="mb-6 flex gap-2 overflow-x-auto whitespace-nowrap border-b border-slate-200">
-        {tabs
-          .filter((tab) => tab.to !== "/admin/staff" || role === "ADMIN")
-          .map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              end={tab.end}
-              className={({ isActive }) =>
-                `px-3 py-2 text-sm font-medium ${
-                  isActive
-                    ? "border-b-2 border-slate-900 text-slate-900"
-                    : "text-slate-500 hover:text-slate-700"
-                }`
-              }
-            >
-              {tab.label}
-            </NavLink>
-          ))}
-      </div>
-      <Outlet />
-    </div>
+    <WorkspaceLayout
+      title="Quản trị sàn"
+      caption="Không gian làm việc"
+      tabs={tabs.filter((t) => t.to !== "/admin/staff" || role === "ADMIN")}
+    />
   );
 }

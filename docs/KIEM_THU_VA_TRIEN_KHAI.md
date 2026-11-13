@@ -54,6 +54,8 @@ Tạo database kiểm thử riêng trước lần chạy đầu. Script từ ch�
 
 Các ca integration bao gồm: xác thực và quyền sở hữu; SKU; tranh kho; idempotency; tranh lượt voucher; hủy đồng thời; chọn dòng giỏ/mua ngay; phân bổ hai shop; quyền STAFF/ADMIN; chặn MoMo chưa trả tiền; IPN số/chữ ký/số tiền/callback trùng; hết hạn và callback muộn; COD/vận đơn/đổi trả/hoàn tiền; đối chiếu COD cũ; khoảng ngày; upload ảnh; khóa tài khoản/đổi mật khẩu; chat và phân trang; chu trình danh mục; voucher 0đ; thanh toán trùng và đối chiếu thống kê.
 
+Đợt cập nhật giao diện/quảng cáo bổ sung kiểm thử quyền sở hữu yêu cầu xóa, lý do trống, yêu cầu trùng, hủy/gửi lại, phản hồi từ chối, STAFF bị chặn quyền xóa, ADMIN xóa trực tiếp, banner đã xóa và banner shop đình chỉ bị loại khỏi API công khai. Kết quả local: 26 integration + 1 unit thành công.
+
 MoMo được giả lập ở bước tạo payUrl trong integration test; xác thực chữ ký và callback được kiểm tra qua HTTP thật vào ứng dụng. Đây không phải bằng chứng đã thực hiện giao dịch ví MoMo thực tế.
 
 Kiểm thử trình duyệt cần API bản nâng cấp và dữ liệu demo. Mặc định test UI dùng API `http://localhost:3100/api` và frontend `http://localhost:5173`.
@@ -74,6 +76,8 @@ npm run test:ui
 
 Playwright tự chạy Vite nếu cổng 5173 chưa được dùng. Nếu dùng API khác, đặt UI_API_URL; nếu frontend đã chạy trước, bảo đảm VITE_API_URL của tiến trình đó trỏ đúng API kiểm thử. Screenshot nằm trong frontend/test-results và được bỏ qua bởi Git.
 
+8 ca UI bao gồm: danh mục/lọc/sắp xếp và bố cục điện thoại; chọn SKU/mua/hủy; quản lý SKU của seller; nhập ngày trong lúc báo cáo đang tải và xuất CSV đúng kỳ; hồ sơ; shop yêu cầu xóa → ADMIN phản hồi/xác nhận xóa; biểu đồ có số âm/kỳ dài và màn hình 390px; đổi tài khoản seller. Ca kiểm tra biểu đồ dùng response giả lập riêng trong Playwright để kiểm tra hiển thị, không ghi doanh thu giả vào database. Những ca đặt/hủy đơn và quản lý quảng cáo dùng API thật; chỉ chạy trên dữ liệu demo/kiểm thử.
+
 Workflow `.github/workflows/verify.yml` chạy build, unit/integration, seed và UI test trên PostgreSQL riêng cho mỗi lần push/PR.
 
 ## Redeploy Render và Vercel
@@ -83,6 +87,7 @@ Backend Render:
 - Root directory: backend.
 - Build: `npm ci --include=dev && npm run build`.
 - Start: `npx prisma migrate deploy && npm run start:prod`.
+- Bản giao diện/quảng cáo yêu cầu migration `20261113120000_ad_deletion_requests` (4 trường nullable mới). Deploy backend và áp dụng migration trước khi kiểm tra trang quảng cáo mới.
 - Health check: `/api`.
 - Giữ DATABASE_URL/JWT/MOMO hiện có. FRONTEND_URL phải đúng origin frontend.
 - `prestart:prod` chèn dữ liệu demo còn thiếu. Đặt SEED_DEMO_DATA=false nếu muốn tắt. Script dùng JavaScript đã build nên không cần ts-node khi khởi động.

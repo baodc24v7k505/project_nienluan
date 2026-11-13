@@ -96,7 +96,35 @@ export class ProductsService {
       this.prisma.product.count({ where }),
     ]);
 
-    return { items, total, page, pageSize };
+    const ids = items.map((item) => item.id);
+    const [ratings, sales] = await Promise.all([
+      this.prisma.review.groupBy({
+        by: ['productId'],
+        where: { productId: { in: ids } },
+        _avg: { rating: true },
+        _count: { _all: true },
+      }),
+      this.prisma.orderItem.groupBy({
+        by: ['productId'],
+        where: { productId: { in: ids }, shopOrder: { status: 'DELIVERED' } },
+        _sum: { quantity: true },
+      }),
+    ]);
+    const ratingMap = new Map(ratings.map((row) => [row.productId, row]));
+    const salesMap = new Map(
+      sales.map((row) => [row.productId, row._sum.quantity ?? 0]),
+    );
+    return {
+      items: items.map((item) => ({
+        ...item,
+        ratingAverage: ratingMap.get(item.id)?._avg.rating ?? 0,
+        reviewCount: ratingMap.get(item.id)?._count._all ?? 0,
+        soldCount: salesMap.get(item.id) ?? 0,
+      })),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async suggest(rawQuery: string) {

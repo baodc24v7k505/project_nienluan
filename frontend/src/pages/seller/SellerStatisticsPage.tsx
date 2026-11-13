@@ -54,7 +54,7 @@ export function SellerStatisticsPage() {
         <StatTile label="Đơn đang xử lý" value={String(pendingCount)} />
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="surface p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">
             Doanh thu theo thời gian
@@ -67,14 +67,14 @@ export function SellerStatisticsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="surface p-4">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             Đơn hàng theo trạng thái
           </h2>
           <StatusBar data={data.ordersByStatus} />
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="surface p-4">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             Top sản phẩm bán chạy
           </h2>
@@ -102,7 +102,7 @@ export function SellerStatisticsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="surface p-4">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             Doanh thu theo danh mục
           </h2>
@@ -125,7 +125,7 @@ export function SellerStatisticsPage() {
           )}
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="surface p-4">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             Hiệu quả voucher
           </h2>

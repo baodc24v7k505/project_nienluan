@@ -113,7 +113,7 @@ export function ChatPage() {
 
   return (
     <div className="grid h-[70vh] grid-cols-1 gap-4 md:grid-cols-[280px_1fr]">
-      <div className="overflow-y-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-y-auto surface">
         {user.role === "CUSTOMER" && (
           <button
             onClick={() => startSupportMutation.mutate()}
@@ -151,7 +151,7 @@ export function ChatPage() {
         ))}
       </div>
 
-      <div className="flex flex-col rounded-lg border border-slate-200 bg-white">
+      <div className="flex flex-col surface">
         {!selectedId ? (
           <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
             Chọn một cuộc trò chuyện để bắt đầu

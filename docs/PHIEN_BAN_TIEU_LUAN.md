@@ -19,6 +19,8 @@ Ngày thực hiện: 13/11/2026. Tài liệu này mô tả bản triển khai sa
 | Ảnh | Upload JPEG/PNG/WebP tối đa 2MB/file; lưu PostgreSQL để không mất khi Render khởi động lại; giới hạn 200 ảnh/tài khoản |
 | Phân quyền | Chặn STAFF quản lý staff/khóa user, bảo vệ ADMIN, kiểm tra trạng thái tài khoản trên API/socket |
 | Giao diện | Phân trang danh sách đơn/sản phẩm seller, lọc giá/sắp xếp, dọn cache khi đổi tài khoản, tải từng trang bằng lazy loading |
+| Giao diện cập nhật | Bố cục dùng nền và khoảng cách thay khung viền tùy tiện; menu quản trị/người bán bên trái; trang chủ gọn danh mục–bộ lọc–sản phẩm; chi tiết tập trung giá, SKU, kho, giao hàng và đánh giá |
+| Quảng cáo | ADMIN xóa trực tiếp hoặc xử lý yêu cầu shop; shop gửi lý do, hủy/gửi lại; quản trị viên phản hồi khi từ chối; quảng cáo đã xóa không xuất hiện ở trang chủ và danh sách quản lý |
 | Chat | Tải lịch sử theo trang, đánh dấu đã đọc khi xem, đếm tin chưa đọc, sửa link thông báo cho seller, nối lại room sau reconnect |
 | Kiểm thử | Bộ integration chạy PostgreSQL riêng, kiểm thử trình duyệt bằng Playwright, workflow GitHub Actions |
 
@@ -36,6 +38,8 @@ Các chức năng kế thừa như đăng ký, shop, danh mục, review, quảng
 8. Hoàn tiền là thao tác thủ công có mã đối chiếu. Nút xác nhận chỉ ghi nhận việc đã hoàn; không thực hiện chuyển tiền qua MoMo/ngân hàng.
 9. Thực thu ròng trong kỳ = tiền thu trong kỳ − khoản hoàn hoàn tất trong kỳ. MoMo ghi theo paidAt; COD theo thời điểm giao/thu của shop. Giá trị hàng giao và top sản phẩm/danh mục theo deliveredAt, trước giảm giá, không gồm phí giao.
 10. Số người dùng/shop và khoản hoàn đang chờ là số liệu hiện tại; chỉ số giao dịch và lượt voucher theo kỳ được chọn. Top shop thể hiện tiền đã thu trước hoàn tiền.
+11. Shop gửi yêu cầu xóa chưa làm banner ngừng chạy. ADMIN xác nhận xóa mới gỡ banner; STAFF vẫn có quyền duyệt nội dung nhưng không được xóa hoặc quyết định yêu cầu xóa. Bản ghi được giữ với `deletedAt` để lưu dấu nội dung và lý do cũ.
+12. Bộ lọc ngày báo cáo chỉ áp dụng khi bấm **Áp dụng**; CSV xuất theo kỳ đã tải. Biểu đồ gộp các ngày liên tiếp thành tối đa 30 cột khi chọn kỳ dài, hiển thị tổng thực thu ròng của mỗi nhóm; tooltip cho biết khoảng ngày và giá trị.
 
 ## Dữ liệu demo
 

@@ -452,6 +452,10 @@ model Advertisement {
   startAt   DateTime
   endAt     DateTime
   createdAt DateTime @default(now())
+  deletionRequestedAt DateTime?
+  deletionReason String?
+  deletionReviewNote String?
+  deletedAt DateTime?
 
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 

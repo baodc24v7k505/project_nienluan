@@ -74,7 +74,7 @@ export function CheckoutPage() {
       <h1 className="mb-5 text-2xl font-semibold">Xác nhận đặt hàng</h1>
       <div className="grid gap-6 md:grid-cols-[1fr_360px]">
         <div className="space-y-5">
-          <section className="rounded border bg-white p-4">
+          <section className="surface p-4">
             <h2 className="mb-3 font-semibold">Địa chỉ giao hàng</h2>
             {addresses?.map((a) => (
               <label
@@ -156,7 +156,7 @@ export function CheckoutPage() {
               </form>
             )}
           </section>
-          <section className="rounded border bg-white p-4">
+          <section className="surface p-4">
             <h2 className="mb-3 font-semibold">Thanh toán</h2>
             {(["COD", "MOMO"] as const).map((m) => (
               <label key={m} className="mb-2 flex gap-2 rounded border p-3">
@@ -173,7 +173,7 @@ export function CheckoutPage() {
               MoMo giữ hàng trong 30 phút. Đơn hết hạn được hủy và hoàn kho.
             </p>
           </section>
-          <section className="rounded border bg-white p-4">
+          <section className="surface p-4">
             <h2 className="mb-2 font-semibold">Giao hàng tiêu chuẩn</h2>
             <p className="text-sm text-slate-500">
               30.000đ mỗi shop; miễn phí khi tiền hàng của shop từ 500.000đ.
@@ -181,7 +181,7 @@ export function CheckoutPage() {
             </p>
           </section>
         </div>
-        <section className="h-fit rounded border bg-white p-4">
+        <section className="h-fit surface p-4">
           <h2 className="mb-4 font-semibold">Chi tiết thanh toán</h2>
           {quote.isLoading && <p>Đang tính giá...</p>}
           {quote.error && (

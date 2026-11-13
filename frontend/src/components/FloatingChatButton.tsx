@@ -1,11 +1,24 @@
-import { Link } from 'react-router-dom';
-import { useAuthStore } from '../store/auth.store';
+import { Link, useLocation } from "react-router-dom";
+import { useAuthStore } from "../store/auth.store";
 
 export function FloatingChatButton() {
   const user = useAuthStore((s) => s.user);
-  if (!user) return null;
+  const { pathname } = useLocation();
+  if (
+    !user ||
+    pathname.startsWith("/product/") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/seller") ||
+    pathname.startsWith("/chat")
+  )
+    return null;
 
-  const to = user.role === 'SELLER' ? '/seller/chat' : user.role === 'CUSTOMER' ? '/chat' : '/admin/chat';
+  const to =
+    user.role === "SELLER"
+      ? "/seller/chat"
+      : user.role === "CUSTOMER"
+        ? "/chat"
+        : "/admin/chat";
 
   return (
     <Link

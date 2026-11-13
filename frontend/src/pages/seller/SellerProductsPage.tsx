@@ -181,7 +181,7 @@ export function SellerProductsPage() {
     <div className="grid grid-cols-1 gap-8 md:grid-cols-[360px_1fr]">
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4"
+        className="flex flex-col gap-3 surface p-4"
       >
         <h2 className="text-sm font-semibold text-slate-900">
           {editing ? `Sửa: ${editing.name}` : "Thêm sản phẩm mới"}

@@ -113,10 +113,7 @@ export function OrdersPage() {
       )}
       <div className="flex flex-col gap-4">
         {data?.items.map((order) => (
-          <div
-            key={order.id}
-            className="rounded-lg border border-slate-200 bg-white p-4"
-          >
+          <div key={order.id} className="surface p-4">
             <div className="mb-2 flex items-center justify-between text-sm text-slate-500">
               <span>Mã đơn: {order.id.slice(0, 8)}</span>
               <span>{new Date(order.createdAt).toLocaleString("vi-VN")}</span>

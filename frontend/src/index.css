@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
 
   --color-brand: #ee4d2d;
   --color-brand-dark: #d73e21;
@@ -16,7 +16,82 @@ body,
 }
 
 body {
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-[#f5f6f8] text-slate-900 antialiased;
+}
+
+@layer base {
+  * {
+    border-color: #e7eaf0;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    outline: 2px solid #ee4d2d;
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .surface {
+    @apply rounded-2xl bg-white;
+    box-shadow: 0 2px 12px rgb(15 23 42 / 3%);
+  }
+  .field {
+    @apply w-full min-w-0 rounded-xl border-0 bg-slate-100/80 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400;
+  }
+  .field:focus {
+    @apply bg-white;
+    box-shadow: 0 0 0 2px #ee4d2d44;
+    outline: none;
+  }
+  .btn {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply bg-brand text-white hover:bg-brand-dark;
+  }
+  .btn-secondary {
+    @apply bg-slate-100 text-slate-700 hover:bg-slate-200;
+  }
+  .btn-danger {
+    @apply bg-red-50 text-red-700 hover:bg-red-100;
+  }
+  .eyebrow {
+    @apply text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400;
+  }
+  .page-title {
+    @apply text-2xl font-semibold tracking-tight text-slate-900 md:text-[28px];
+  }
+  .section-title {
+    @apply text-base font-semibold tracking-tight text-slate-900;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium;
+  }
+  .muted {
+    @apply text-sm leading-relaxed text-slate-500;
+  }
+  .report-table th {
+    @apply whitespace-nowrap pb-3 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400;
+  }
+  .report-table td {
+    @apply py-3.5 text-sm;
+  }
+  .report-table tbody tr + tr {
+    @apply border-t border-slate-100;
+  }
 }
 
 .hide-scrollbar::-webkit-scrollbar {

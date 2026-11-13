@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-} from '../api/notifications';
+} from "../api/notifications";
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -13,19 +13,21 @@ export function NotificationBell() {
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ["notifications"],
     queryFn: listNotifications,
     refetchInterval: 60_000,
   });
 
   const markReadMutation = useMutation({
     mutationFn: markNotificationRead,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
   const markAllMutation = useMutation({
     mutationFn: markAllNotificationsRead,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
   function handleClickNotification(id: string, link: string | null) {
@@ -38,13 +40,13 @@ export function NotificationBell() {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative text-xl text-white md:text-2xl"
+        className="relative text-lg text-slate-600 hover:text-brand"
         aria-label="Thông báo"
       >
         <i className="far fa-bell" />
         {!!data?.unreadCount && (
-          <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-brand">
-            {data.unreadCount > 9 ? '9+' : data.unreadCount}
+          <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-[10px] font-semibold text-white">
+            {data.unreadCount > 9 ? "9+" : data.unreadCount}
           </span>
         )}
       </button>
@@ -66,14 +68,18 @@ export function NotificationBell() {
             </div>
             <div className="max-h-96 overflow-y-auto">
               {data?.items.length === 0 && (
-                <p className="p-4 text-center text-sm text-slate-400">Chưa có thông báo nào</p>
+                <p className="p-4 text-center text-sm text-slate-400">
+                  Chưa có thông báo nào
+                </p>
               )}
               {data?.items.map((n) => (
                 <button
                   key={n.id}
                   onClick={() => handleClickNotification(n.id, n.link)}
                   className={`block w-full border-b border-slate-50 px-3 py-2 text-left text-sm hover:bg-slate-50 ${
-                    n.isRead ? 'text-slate-500' : 'bg-brand-bg font-medium text-slate-900'
+                    n.isRead
+                      ? "text-slate-500"
+                      : "bg-brand-bg font-medium text-slate-900"
                   }`}
                 >
                   <p>{n.title}</p>

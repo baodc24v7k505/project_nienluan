@@ -1,14 +1,14 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { createStaff, deleteStaff, listStaff } from '../../api/admin';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { createStaff, deleteStaff, listStaff } from "../../api/admin";
 
 const schema = z.object({
-  fullName: z.string().min(2, 'Họ tên tối thiểu 2 ký tự'),
-  email: z.string().email('Email không hợp lệ'),
-  password: z.string().min(6, 'Mật khẩu tối thiểu 6 ký tự'),
+  fullName: z.string().min(2, "Họ tên tối thiểu 2 ký tự"),
+  email: z.string().email("Email không hợp lệ"),
+  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
   phone: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
@@ -17,7 +17,7 @@ export function AdminStaffPage() {
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-staff'],
+    queryKey: ["admin-staff"],
     queryFn: () => listStaff({}),
   });
 
@@ -31,14 +31,15 @@ export function AdminStaffPage() {
   const createMutation = useMutation({
     mutationFn: createStaff,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-staff'] });
+      queryClient.invalidateQueries({ queryKey: ["admin-staff"] });
       reset();
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteStaff,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-staff'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["admin-staff"] }),
   });
 
   async function onSubmit(values: FormValues) {
@@ -46,7 +47,7 @@ export function AdminStaffPage() {
     try {
       await createMutation.mutateAsync(values);
     } catch (err: any) {
-      setServerError(err?.response?.data?.message ?? 'Tạo nhân viên thất bại');
+      setServerError(err?.response?.data?.message ?? "Tạo nhân viên thất bại");
     }
   }
 
@@ -54,41 +55,51 @@ export function AdminStaffPage() {
     <div className="grid grid-cols-1 gap-8 md:grid-cols-[320px_1fr]">
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4"
+        className="flex flex-col gap-3 surface p-4"
       >
-        <h2 className="text-sm font-semibold text-slate-900">Thêm nhân viên mới</h2>
+        <h2 className="text-sm font-semibold text-slate-900">
+          Thêm nhân viên mới
+        </h2>
         <div>
           <input
-            {...register('fullName')}
+            {...register("fullName")}
             placeholder="Họ và tên"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
-          {errors.fullName && <p className="mt-1 text-xs text-red-600">{errors.fullName.message}</p>}
+          {errors.fullName && (
+            <p className="mt-1 text-xs text-red-600">
+              {errors.fullName.message}
+            </p>
+          )}
         </div>
         <div>
           <input
-            {...register('email')}
+            {...register("email")}
             placeholder="Email"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
-          {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
+          {errors.email && (
+            <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
+          )}
         </div>
         <div>
           <input
-            {...register('phone')}
+            {...register("phone")}
             placeholder="Số điện thoại (tùy chọn)"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
         <div>
           <input
-            {...register('password')}
+            {...register("password")}
             type="password"
             placeholder="Mật khẩu"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
           {errors.password && (
-            <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
+            <p className="mt-1 text-xs text-red-600">
+              {errors.password.message}
+            </p>
           )}
         </div>
         {serverError && <p className="text-sm text-red-600">{serverError}</p>}
@@ -119,7 +130,7 @@ export function AdminStaffPage() {
                 <tr key={s.id} className="border-b border-slate-100">
                   <td className="py-2">{s.email}</td>
                   <td>{s.fullName}</td>
-                  <td>{s.phone ?? '-'}</td>
+                  <td>{s.phone ?? "-"}</td>
                   <td className="text-right">
                     <button
                       onClick={() => deleteMutation.mutate(s.id)}
@@ -134,7 +145,9 @@ export function AdminStaffPage() {
           </table>
         )}
         {data && data.items.length === 0 && (
-          <p className="mt-4 text-center text-slate-400">Chưa có nhân viên nào</p>
+          <p className="mt-4 text-center text-slate-400">
+            Chưa có nhân viên nào
+          </p>
         )}
       </div>
     </div>

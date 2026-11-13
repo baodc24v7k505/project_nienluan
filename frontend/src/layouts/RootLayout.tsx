@@ -8,125 +8,140 @@ import { FloatingChatButton } from "../components/FloatingChatButton";
 import { NotificationBell } from "../components/NotificationBell";
 import { HeaderSearch } from "../components/HeaderSearch";
 import { useRealtimeConnection } from "../realtime/useRealtimeConnection";
-
 export function RootLayout() {
-  const user = useAuthStore((s) => s.user);
-  const clearAuth = useAuthStore((s) => s.clearAuth);
-  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user),
+    clearAuth = useAuthStore((s) => s.clearAuth),
+    navigate = useNavigate();
   useRealtimeConnection();
-
   const { data: cart } = useQuery({
     queryKey: ["cart"],
     queryFn: getCart,
     enabled: user?.role === "CUSTOMER",
   });
   const cartCount = cart?.items.length ?? 0;
-
-  async function handleLogout() {
+  const chatLink =
+    user?.role === "SELLER"
+      ? "/seller/chat"
+      : user?.role === "CUSTOMER"
+        ? "/chat"
+        : "/admin/chat";
+  async function logout() {
     await logoutApi().catch(() => {});
     clearAuth();
     navigate("/");
   }
-
   return (
-    <div className="flex min-h-screen flex-col pb-14 md:pb-0">
-      <header className="sticky top-0 z-40 bg-brand shadow-sm">
-        {/* Thanh tiện ích trên cùng */}
-        <div className="hidden border-b border-white/15 md:block">
-          <div className="mx-auto flex max-w-6xl items-center justify-end gap-4 px-4 py-1.5 text-[13px] text-white/90">
-            {user?.role === "SELLER" && (
-              <Link to="/seller" className="hover:text-white">
-                Kênh người bán
-              </Link>
-            )}
-            {(user?.role === "ADMIN" || user?.role === "STAFF") && (
-              <Link to="/admin" className="hover:text-white">
-                Quản trị
+    <div className="flex min-h-screen flex-col pb-16 md:pb-0">
+      <header className="sticky top-0 z-40 bg-white shadow-[0_2px_14px_rgb(15_23_42/4%)]">
+        <div className="hidden bg-[#f0f2f5] md:block">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-2 text-[11px] text-slate-500">
+            <span>Khám phá nhiều gian hàng. Mua sắm thuận tiện.</span>
+            <div className="flex items-center gap-5">
+              {user?.role === "SELLER" && (
+                <Link to="/seller" className="hover:text-brand">
+                  Kênh người bán
+                </Link>
+              )}
+              {(user?.role === "ADMIN" || user?.role === "STAFF") && (
+                <Link to="/admin" className="hover:text-brand">
+                  Quản trị
+                </Link>
+              )}
+              {user?.role === "CUSTOMER" && (
+                <Link to="/orders" className="hover:text-brand">
+                  Đơn hàng của tôi
+                </Link>
+              )}
+              {user ? (
+                <>
+                  <Link to="/account" className="font-medium text-slate-700">
+                    Tài khoản: {user.fullName}
+                  </Link>
+                  <button onClick={logout} className="hover:text-brand">
+                    Đăng xuất
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/register">Đăng ký</Link>
+                  <Link to="/login" className="font-semibold text-slate-700">
+                    Đăng nhập
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-3 px-4 py-4 md:flex-nowrap md:gap-10 md:px-6 md:py-5">
+          <Link
+            to="/"
+            aria-label="Sàn TMĐT - Trang chủ"
+            className="flex shrink-0 items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900 md:text-xl"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-base text-white">
+              <i className="fas fa-store" aria-hidden="true" />
+            </span>
+            Sàn TMĐT
+          </Link>
+          <div className="order-last w-full md:order-none md:flex-1">
+            <HeaderSearch />
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-4 text-lg text-slate-600">
+            {user ? (
+              <>
+                <Link
+                  to={chatLink}
+                  aria-label="Tin nhắn"
+                  className="hover:text-brand"
+                >
+                  <i className="far fa-comment-dots" aria-hidden="true" />
+                </Link>
+                <NotificationBell />
+                <Link
+                  to="/account"
+                  aria-label={`Tài khoản: ${user.fullName}`}
+                  className="text-base md:hidden"
+                >
+                  <i className="far fa-user" aria-hidden="true" />
+                </Link>
+              </>
+            ) : (
+              <Link to="/login" aria-label="Đăng nhập" className="md:hidden">
+                <i className="far fa-user" aria-hidden="true" />
               </Link>
             )}
             {user?.role === "CUSTOMER" && (
-              <Link to="/orders" className="hover:text-white">
-                Đơn hàng của tôi
+              <Link
+                to="/cart"
+                aria-label={`Giỏ hàng, ${cartCount} sản phẩm`}
+                className="relative hover:text-brand"
+              >
+                <i className="fas fa-bag-shopping" aria-hidden="true" />
+                {cartCount > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold text-white">
+                    {cartCount}
+                  </span>
+                )}
               </Link>
-            )}
-            {user ? (
-              <>
-                <Link to="/account">Tài khoản: {user.fullName}</Link>
-                <button
-                  onClick={handleLogout}
-                  className="font-medium hover:text-white"
-                >
-                  Đăng xuất
-                </button>
-              </>
-            ) : (
-              <>
-                <Link to="/register" className="hover:text-white">
-                  Đăng ký
-                </Link>
-                <span className="h-3 border-r border-white/40" />
-                <Link to="/login" className="font-medium hover:text-white">
-                  Đăng nhập
-                </Link>
-              </>
             )}
           </div>
         </div>
-
-        {/* Thanh chính: logo + tìm kiếm + giỏ hàng */}
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 md:gap-8 md:py-4">
-          <Link
-            to="/"
-            className="flex flex-shrink-0 items-center gap-2 text-xl font-bold text-white md:text-2xl"
-          >
-            <i className="fas fa-store" />
-            <span>Sàn TMĐT</span>
-          </Link>
-
-          <HeaderSearch />
-
-          {user && (
-            <div className="flex flex-shrink-0 items-center gap-4">
-              <Link
-                to={
-                  user.role === "SELLER"
-                    ? "/seller/chat"
-                    : user.role === "CUSTOMER"
-                      ? "/chat"
-                      : "/admin/chat"
-                }
-                className="text-xl text-white md:text-2xl"
-              >
-                <i className="far fa-comment-dots" />
-              </Link>
-              <NotificationBell />
-            </div>
-          )}
-
-          {user?.role === "CUSTOMER" && (
-            <Link
-              to="/cart"
-              className="relative flex-shrink-0 text-2xl text-white md:text-3xl"
-            >
-              <i className="fas fa-shopping-cart" />
-              {cartCount > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-brand">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
-          )}
-        </div>
       </header>
-
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6 md:py-8">
         <Outlet />
       </main>
-
-      <footer className="hidden border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400 md:block">
-        © 2026 Sàn thương mại điện tử — Tiểu luận
+      <footer className="mt-10 hidden bg-white md:block">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-7 text-xs text-slate-400">
+          <span className="font-semibold text-slate-600">
+            <i className="fas fa-store mr-2 text-brand" aria-hidden="true" />
+            Sàn TMĐT
+          </span>
+          <span>© 2026 · Hệ thống thương mại điện tử đa gian hàng</span>
+          <Link to={user ? chatLink : "/login"} className="hover:text-brand">
+            Trung tâm hỗ trợ
+          </Link>
+        </div>
       </footer>
-
       <FloatingChatButton />
       <MobileBottomNav cartCount={cartCount} />
     </div>

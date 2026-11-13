@@ -14,6 +14,9 @@ export interface ProductImage {
 }
 
 export interface Product {
+  ratingAverage?: number;
+  reviewCount?: number;
+  soldCount?: number;
   variants: ProductVariant[];
   id: string;
   shopId: string;

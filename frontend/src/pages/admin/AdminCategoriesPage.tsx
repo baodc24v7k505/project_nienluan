@@ -1,45 +1,53 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createCategory, deleteCategory, listCategories } from '../../api/categories';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  createCategory,
+  deleteCategory,
+  listCategories,
+} from "../../api/categories";
 
 export function AdminCategoriesPage() {
   const queryClient = useQueryClient();
-  const [name, setName] = useState('');
-  const [parentId, setParentId] = useState('');
+  const [name, setName] = useState("");
+  const [parentId, setParentId] = useState("");
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({ queryKey: ['categories'], queryFn: listCategories });
+  const { data, isLoading } = useQuery({
+    queryKey: ["categories"],
+    queryFn: listCategories,
+  });
 
   const createMutation = useMutation({
     mutationFn: createCategory,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-      setName('');
-      setParentId('');
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      setName("");
+      setParentId("");
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteCategory,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["categories"] }),
   });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setServerError(null);
     try {
-      await createMutation.mutateAsync({ name, parentId: parentId || undefined });
+      await createMutation.mutateAsync({
+        name,
+        parentId: parentId || undefined,
+      });
     } catch (err: any) {
-      setServerError(err?.response?.data?.message ?? 'Tạo danh mục thất bại');
+      setServerError(err?.response?.data?.message ?? "Tạo danh mục thất bại");
     }
   }
 
   return (
     <div className="grid grid-cols-1 gap-8 md:grid-cols-[320px_1fr]">
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4"
-      >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 surface p-4">
         <h2 className="text-sm font-semibold text-slate-900">Thêm danh mục</h2>
         <input
           value={name}
@@ -88,7 +96,7 @@ export function AdminCategoriesPage() {
                 <tr key={c.id} className="border-b border-slate-100">
                   <td className="py-2">{c.name}</td>
                   <td className="text-slate-400">{c.slug}</td>
-                  <td>{data.find((p) => p.id === c.parentId)?.name ?? '-'}</td>
+                  <td>{data.find((p) => p.id === c.parentId)?.name ?? "-"}</td>
                   <td className="text-right">
                     <button
                       onClick={() => deleteMutation.mutate(c.id)}

@@ -1,161 +1,364 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { createSellerAd, listSellerAds } from '../../api/ads';
-
-const schema = z.object({
-  title: z.string().min(3, 'Tiêu đề tối thiểu 3 ký tự'),
-  imageUrl: z.string().url('URL ảnh không hợp lệ'),
-  linkUrl: z.string().url('URL không hợp lệ').optional().or(z.literal('')),
-  startAt: z.string().min(1, 'Chọn ngày bắt đầu'),
-  endAt: z.string().min(1, 'Chọn ngày kết thúc'),
-});
-type FormValues = z.infer<typeof schema>;
-
-const statusLabel: Record<string, string> = {
-  PENDING: 'Đang chờ duyệt',
-  APPROVED: 'Đã duyệt',
-  REJECTED: 'Bị từ chối',
-  EXPIRED: 'Đã hết hạn',
-};
-
-const statusStyles: Record<string, string> = {
-  PENDING: 'bg-amber-100 text-amber-700',
-  APPROVED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-700',
-  EXPIRED: 'bg-slate-200 text-slate-600',
-};
-
+import { useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  cancelAdDeletion,
+  createSellerAd,
+  listSellerAds,
+  requestAdDeletion,
+} from "../../api/ads";
+import type { Advertisement } from "../../types/ad";
+import { Dialog } from "../../components/Dialog";
+import { ImageUpload } from "../../components/ImageUpload";
+import { Pagination } from "../../components/Pagination";
+import { adColors, adDate, adLabels } from "../../lib/adStatus";
 export function SellerAdsPage() {
-  const queryClient = useQueryClient();
-  const [serverError, setServerError] = useState<string | null>(null);
-
-  const { data, isLoading } = useQuery({ queryKey: ['seller-ads'], queryFn: listSellerAds });
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
-
-  const createMutation = useMutation({
+  const qc = useQueryClient(),
+    formRef = useRef<HTMLFormElement>(null);
+  const [page, setPage] = useState(1),
+    [creating, setCreating] = useState(false),
+    [imageUrl, setImageUrl] = useState(""),
+    [start, setStart] = useState(""),
+    [target, setTarget] = useState<Advertisement | null>(null),
+    [reason, setReason] = useState("");
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["seller-ads", page],
+    queryFn: () => listSellerAds(page),
+  });
+  const create = useMutation({
     mutationFn: createSellerAd,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['seller-ads'] });
-      reset();
+      setCreating(false);
+      setImageUrl("");
+      setStart("");
+      setPage(1);
+      qc.invalidateQueries({ queryKey: ["seller-ads"] });
     },
   });
-
-  async function onSubmit(values: FormValues) {
-    setServerError(null);
-    try {
-      await createMutation.mutateAsync({
-        ...values,
-        linkUrl: values.linkUrl || undefined,
-        startAt: new Date(values.startAt).toISOString(),
-        endAt: new Date(values.endAt).toISOString(),
-      });
-    } catch (err: any) {
-      setServerError(err?.response?.data?.message ?? 'Gửi quảng cáo thất bại');
-    }
-  }
-
+  const request = useMutation({
+    mutationFn: () => requestAdDeletion(target!.id, reason.trim()),
+    onSuccess: () => {
+      setTarget(null);
+      setReason("");
+      qc.invalidateQueries({ queryKey: ["seller-ads"] });
+    },
+  });
+  const cancel = useMutation({
+    mutationFn: cancelAdDeletion,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["seller-ads"] }),
+  });
   return (
-    <div className="grid grid-cols-1 gap-8 md:grid-cols-[360px_1fr]">
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4"
-      >
-        <h2 className="text-sm font-semibold text-slate-900">Gửi banner quảng cáo</h2>
-        <p className="text-xs text-slate-400">
-          Banner sẽ hiển thị ở trang chủ sau khi được Admin duyệt.
-        </p>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <input
-            {...register('title')}
-            placeholder="Tiêu đề quảng cáo"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-          {errors.title && <p className="mt-1 text-xs text-red-600">{errors.title.message}</p>}
+          <p className="eyebrow mb-2">Giới thiệu gian hàng</p>
+          <h2 className="page-title">Quảng cáo của shop</h2>
+          <p className="muted mt-2">
+            Tạo banner và theo dõi quá trình duyệt trên sàn.
+          </p>
         </div>
-        <div>
-          <input
-            {...register('imageUrl')}
-            placeholder="URL ảnh banner (VD: https://placehold.co/800x300)"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-          {errors.imageUrl && (
-            <p className="mt-1 text-xs text-red-600">{errors.imageUrl.message}</p>
-          )}
-        </div>
-        <div>
-          <input
-            {...register('linkUrl')}
-            placeholder="Link đích khi bấm vào (tùy chọn)"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-          {errors.linkUrl && <p className="mt-1 text-xs text-red-600">{errors.linkUrl.message}</p>}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-xs text-slate-500">Bắt đầu</label>
-            <input
-              {...register('startAt')}
-              type="date"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-slate-500">Kết thúc</label>
-            <input
-              {...register('endAt')}
-              type="date"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-        </div>
-        {(errors.startAt || errors.endAt) && (
-          <p className="text-xs text-red-600">Vui lòng chọn đầy đủ ngày bắt đầu/kết thúc</p>
-        )}
-        {serverError && <p className="text-sm text-red-600">{serverError}</p>}
         <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+          className="btn btn-primary"
+          onClick={() => {
+            setCreating(true);
+            create.reset();
+          }}
         >
-          Gửi duyệt
+          <i className="fas fa-plus text-xs" aria-hidden="true" />
+          Tạo quảng cáo
         </button>
-      </form>
-
-      <div>
-        {isLoading ? (
-          <p className="text-slate-500">Đang tải...</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {data?.items.map((ad) => (
-              <div key={ad.id} className="rounded-lg border border-slate-200 bg-white p-3">
-                <img src={ad.imageUrl} alt={ad.title} className="mb-2 h-32 w-full rounded-md object-cover" />
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-slate-900">{ad.title}</p>
-                  <span className={`rounded px-2 py-0.5 text-xs ${statusStyles[ad.status]}`}>
-                    {statusLabel[ad.status]}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-400">
-                  {new Date(ad.startAt).toLocaleDateString('vi-VN')} -{' '}
-                  {new Date(ad.endAt).toLocaleDateString('vi-VN')}
-                </p>
-              </div>
-            ))}
-            {data && data.items.length === 0 && (
-              <p className="text-center text-slate-400">Chưa có quảng cáo nào</p>
-            )}
-          </div>
-        )}
+      </header>
+      <div className="flex items-start gap-3 rounded-2xl bg-[#edf1f6] px-5 py-4">
+        <i
+          className="fas fa-circle-info mt-0.5 text-sm text-slate-400"
+          aria-hidden="true"
+        />
+        <p className="text-xs leading-5 text-slate-500">
+          Banner xuất hiện khi được duyệt và trong thời gian chạy. Khi không còn
+          nhu cầu, bạn có thể gửi yêu cầu xóa để quản trị viên xử lý.
+        </p>
       </div>
+      {cancel.error && (
+        <p role="alert" className="text-sm text-red-600">
+          Không thể hủy yêu cầu. Vui lòng tải lại trang.
+        </p>
+      )}
+      {isLoading ? (
+        <p className="muted py-12 text-center">Đang tải quảng cáo…</p>
+      ) : error ? (
+        <p
+          role="alert"
+          className="surface p-8 text-center text-sm text-red-600"
+        >
+          Không tải được quảng cáo của shop.
+        </p>
+      ) : !data?.items.length ? (
+        <div className="surface py-16 text-center">
+          <i
+            className="fas fa-bullhorn mb-4 text-3xl text-slate-200"
+            aria-hidden="true"
+          />
+          <h3 className="font-medium">Giới thiệu shop bằng banner đầu tiên</h3>
+          <p className="muted mt-2">
+            Chuẩn bị ảnh, nội dung và thời gian hiển thị để gửi duyệt.
+          </p>
+          <button
+            className="btn btn-secondary mt-5"
+            onClick={() => setCreating(true)}
+          >
+            Tạo banner mới
+          </button>
+        </div>
+      ) : (
+        <div className="grid items-start gap-5 md:grid-cols-2">
+          {data.items.map((ad) => (
+            <article key={ad.id} className="surface overflow-hidden">
+              <div className="relative aspect-[2.8/1] bg-slate-100">
+                <img
+                  src={ad.imageUrl}
+                  alt={ad.title}
+                  className="h-full w-full object-cover"
+                />
+                <span
+                  className={`badge absolute left-3 top-3 shadow-sm ${adColors[ad.status]}`}
+                >
+                  {adLabels[ad.status]}
+                </span>
+              </div>
+              <div className="p-5">
+                <h3 className="text-sm font-semibold leading-6">{ad.title}</h3>
+                <p className="mt-3 text-[11px] text-slate-400">
+                  <i className="far fa-calendar mr-1.5" aria-hidden="true" />
+                  {adDate(ad.startAt)} — {adDate(ad.endAt)}
+                </p>
+                {ad.deletionRequestedAt ? (
+                  <div className="mt-4 rounded-xl bg-amber-50 p-3.5">
+                    <p className="text-xs font-semibold text-amber-800">
+                      Yêu cầu xóa đang chờ xử lý
+                    </p>
+                    <p className="mt-1.5 text-xs leading-5 text-amber-800/70">
+                      {ad.deletionReason}
+                    </p>
+                    <p className="mt-2 text-[10px] text-amber-700/60">
+                      Banner vẫn tuân theo lịch hiển thị cho đến khi được xóa.
+                    </p>
+                    <button
+                      disabled={cancel.isPending}
+                      className="mt-3 text-[11px] font-semibold text-amber-800"
+                      onClick={() => cancel.mutate(ad.id)}
+                    >
+                      Hủy yêu cầu xóa
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {ad.deletionReviewNote && (
+                      <div className="mt-4 rounded-xl bg-slate-50 p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                          Phản hồi về yêu cầu xóa
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">
+                          {ad.deletionReviewNote}
+                        </p>
+                      </div>
+                    )}
+                    <button
+                      className="mt-5 inline-flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-red-600"
+                      onClick={() => {
+                        setTarget(ad);
+                        setReason("");
+                        request.reset();
+                      }}
+                    >
+                      <i
+                        className="far fa-trash-can text-[11px]"
+                        aria-hidden="true"
+                      />
+                      Yêu cầu xóa
+                    </button>
+                  </>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+      {data && (
+        <Pagination
+          page={page}
+          pageSize={data.pageSize}
+          total={data.total}
+          onPageChange={setPage}
+        />
+      )}
+      {target && (
+        <Dialog
+          title="Yêu cầu xóa quảng cáo"
+          onClose={() => setTarget(null)}
+          busy={request.isPending}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              request.mutate();
+            }}
+          >
+            <p className="text-sm font-medium">{target.title}</p>
+            <p className="muted mt-2">
+              Cho quản trị viên biết lý do bạn muốn gỡ banner này.
+            </p>
+            <label className="mt-5 block text-xs font-medium text-slate-500">
+              Lý do yêu cầu
+              <textarea
+                required
+                minLength={5}
+                maxLength={1000}
+                className="field mt-2 min-h-28"
+                placeholder="Ví dụ: chiến dịch đã kết thúc, cần thay banner…"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </label>
+            {request.error && (
+              <p role="alert" className="mt-3 text-xs text-red-600">
+                {(request.error as any).response?.data?.message ??
+                  "Không gửi được yêu cầu"}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setTarget(null)}
+                disabled={request.isPending}
+              >
+                Quay lại
+              </button>
+              <button className="btn btn-primary" disabled={request.isPending}>
+                {request.isPending ? "Đang gửi…" : "Gửi yêu cầu xóa"}
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+      {creating && (
+        <Dialog
+          title="Tạo quảng cáo mới"
+          onClose={() => setCreating(false)}
+          busy={create.isPending}
+        >
+          <form
+            ref={formRef}
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              create.mutate({
+                title: String(f.get("title")).trim(),
+                imageUrl,
+                linkUrl: String(f.get("linkUrl") || "") || undefined,
+                startAt: new Date(
+                  String(f.get("startAt")) + "T00:00:00",
+                ).toISOString(),
+                endAt: new Date(
+                  String(f.get("endAt")) + "T23:59:59.999",
+                ).toISOString(),
+              });
+            }}
+          >
+            <label className="block text-xs font-medium text-slate-500">
+              Tiêu đề banner
+              <input
+                name="title"
+                required
+                minLength={3}
+                className="field mt-2"
+                placeholder="Thông điệp ngắn gọn cho chiến dịch"
+              />
+            </label>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">
+                Ảnh banner
+                <input
+                  name="imageUrl"
+                  required
+                  type="url"
+                  className="field mt-2"
+                  placeholder="https://…"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                />
+              </label>
+              <div className="mt-2">
+                <ImageUpload onUpload={setImageUrl} />
+              </div>
+              {imageUrl && (
+                <img
+                  src={imageUrl}
+                  alt="Xem trước banner"
+                  className="mt-3 aspect-[2.8/1] w-full rounded-xl bg-slate-50 object-cover"
+                />
+              )}
+              <p className="mt-2 text-[10px] text-slate-400">
+                Ảnh ngang, nội dung rõ và ít chữ để dễ đọc trên trang chủ.
+              </p>
+            </div>
+            <label className="block text-xs font-medium text-slate-500">
+              Liên kết khi nhấn banner{" "}
+              <span className="font-normal text-slate-400">
+                (không bắt buộc)
+              </span>
+              <input
+                name="linkUrl"
+                type="url"
+                className="field mt-2"
+                placeholder="https://…"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-xs font-medium text-slate-500">
+                Từ ngày
+                <input
+                  name="startAt"
+                  required
+                  type="date"
+                  className="field mt-2"
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                />
+              </label>
+              <label className="text-xs font-medium text-slate-500">
+                Đến hết ngày
+                <input
+                  name="endAt"
+                  required
+                  type="date"
+                  min={start || undefined}
+                  className="field mt-2"
+                />
+              </label>
+            </div>
+            {create.error && (
+              <p role="alert" className="text-xs text-red-600">
+                {(create.error as any).response?.data?.message ??
+                  "Không tạo được quảng cáo"}
+              </p>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setCreating(false)}
+                disabled={create.isPending}
+              >
+                Quay lại
+              </button>
+              <button className="btn btn-primary" disabled={create.isPending}>
+                {create.isPending ? "Đang gửi…" : "Gửi duyệt"}
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
     </div>
   );
 }

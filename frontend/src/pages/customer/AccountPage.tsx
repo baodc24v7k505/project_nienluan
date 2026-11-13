@@ -29,7 +29,7 @@ export function AccountPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-2xl font-semibold">Tài khoản của tôi</h1>
       <form
-        className="space-y-3 rounded border bg-white p-5"
+        className="space-y-3 surface p-5"
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
@@ -69,7 +69,7 @@ export function AccountPage() {
         </button>
       </form>
       <form
-        className="space-y-3 rounded border bg-white p-5"
+        className="space-y-3 surface p-5"
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
@@ -112,7 +112,7 @@ export function AccountPage() {
         </button>
       </form>
       {user.role === "CUSTOMER" && (
-        <section className="space-y-3 rounded border bg-white p-5">
+        <section className="space-y-3 surface p-5">
           <h2 className="font-semibold">Sổ địa chỉ</h2>
           {addresses?.map((a) => (
             <div key={a.id} className="rounded border p-3 text-sm">

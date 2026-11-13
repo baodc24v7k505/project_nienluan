@@ -57,7 +57,7 @@ export function OrderDetailPage() {
         Chi tiết đơn hàng #{order.id.slice(0, 8)}
       </h1>
 
-      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+      <div className="mb-4 surface p-4 text-sm">
         <p>
           <span className="text-slate-500">Người nhận:</span>{" "}
           {order.recipientName} — {order.recipientPhone}
@@ -88,7 +88,7 @@ export function OrderDetailPage() {
       {order.paymentMethod === "MOMO" &&
         ["PENDING", "FAILED"].includes(order.paymentStatus) &&
         order.shopOrders.every((s) => s.status === "PENDING") && (
-          <div className="mb-4 rounded border bg-white p-4">
+          <div className="mb-4 surface p-4">
             <p className="mb-2 text-sm">
               {order.expiresAt
                 ? `Hạn thanh toán: ${new Date(order.expiresAt).toLocaleString("vi-VN")}`
@@ -111,10 +111,7 @@ export function OrderDetailPage() {
         )}
       <div className="flex flex-col gap-4">
         {order.shopOrders.map((so) => (
-          <div
-            key={so.id}
-            className="rounded-lg border border-slate-200 bg-white p-4"
-          >
+          <div key={so.id} className="surface p-4">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-sm font-medium text-slate-900">
                 {so.shop.name}
@@ -162,7 +159,7 @@ export function OrderDetailPage() {
         ))}
       </div>
 
-      <div className="mt-4 flex justify-between rounded-lg border border-slate-200 bg-white p-4 text-base font-semibold">
+      <div className="mt-4 flex justify-between surface p-4 text-base font-semibold">
         <span>Tổng tiền lúc đặt</span>
         <span className="text-brand">{formatVnd(order.totalAmount)}</span>
       </div>

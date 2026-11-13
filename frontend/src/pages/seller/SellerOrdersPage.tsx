@@ -40,10 +40,7 @@ export function SellerOrdersPage() {
   return (
     <div className="flex flex-col gap-4">
       {data?.items.map((so) => (
-        <div
-          key={so.id}
-          className="rounded-lg border border-slate-200 bg-white p-4"
-        >
+        <div key={so.id} className="surface p-4">
           <div className="mb-2 flex items-center justify-between text-sm text-slate-500">
             <span>
               Khách hàng: {so.order?.customer.fullName} (

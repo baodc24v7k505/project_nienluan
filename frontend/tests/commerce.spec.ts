@@ -58,6 +58,21 @@ test("customer buys one chosen SKU, sees shipping and cancels the order", async 
   expect(p.variants.length).toBe(3);
   await page.goto(`/product/${p.id}`);
   await page.getByRole("button", { name: "Tiêu chuẩn", exact: true }).click();
+  await page.screenshot({
+    path: "test-results/product-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "test-results/product-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole("button", { name: "Mua Ngay", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Xác nhận đặt hàng" }),
@@ -118,15 +133,40 @@ test("seller views SKU editor and order management without runtime errors", asyn
 });
 test("admin changes report dates and downloads CSV", async ({ page }) => {
   await login(page, "admin@ecom.local");
+  let releaseInitial = () => {};
+  const initialGate = new Promise<void>((resolve) => {
+    releaseInitial = resolve;
+  });
+  await page.route("**/api/admin/statistics?*", async (route) => {
+    if (!new URL(route.request().url()).searchParams.has("from"))
+      await initialGate;
+    await route.continue();
+  });
   await page.goto("/admin");
   await expect(
     page.getByText("Thực thu ròng trong kỳ", { exact: true }),
   ).toBeVisible();
   await page.getByLabel("Từ ngày", { exact: true }).fill("2026-01-01");
   await page.getByLabel("Đến ngày", { exact: true }).fill("2026-12-31");
+  releaseInitial();
+  await expect(
+    page.getByRole("button", { name: "Áp dụng", exact: true }),
+  ).toBeEnabled();
+  await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue(
+    "2026-01-01",
+  );
+  const report = page.waitForResponse(
+    (r) =>
+      r.url().includes("/admin/statistics?") &&
+      r.url().includes("from=2026-01-01"),
+  );
+  await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
+  expect((await report).status()).toBe(200);
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Xuất CSV", exact: true }).click();
-  expect((await download).suggestedFilename()).toContain("bao-cao");
+  expect((await download).suggestedFilename()).toBe(
+    "bao-cao-2026-01-01-2026-12-31.csv",
+  );
   await page.screenshot({
     path: "test-results/admin-report.png",
     fullPage: true,
@@ -140,6 +180,160 @@ test("customer manages profile and address book", async ({ page }) => {
     page.getByRole("button", { name: "Lưu thông tin", exact: true }),
   ).toBeVisible();
   await page.screenshot({ path: "test-results/account.png", fullPage: true });
+});
+
+test("shop requests banner removal, admin responds and confirms deletion", async ({
+  page,
+  request,
+}) => {
+  const title = `Kiểm thử banner ${Date.now()}`;
+  const auth = await request.post(`${API}/auth/login`, {
+    data: { email: "seller1@ecom.local", password: "password123" },
+  });
+  expect(auth.ok()).toBeTruthy();
+  const tokens = await auth.json();
+  const created = await request.post(`${API}/seller/ads`, {
+    headers: { Authorization: `Bearer ${tokens.accessToken}` },
+    data: {
+      title,
+      imageUrl:
+        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=900",
+      startAt: new Date(Date.now() - 60000).toISOString(),
+      endAt: new Date(Date.now() + 86400000).toISOString(),
+    },
+  });
+  expect(created.ok()).toBeTruthy();
+  await login(page, "seller1@ecom.local");
+  await page.goto("/seller/ads");
+  let card = page
+    .locator("article")
+    .filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+  await card.getByRole("button", { name: "Yêu cầu xóa", exact: true }).click();
+  await page
+    .getByLabel("Lý do yêu cầu", { exact: true })
+    .fill("Chiến dịch kiểm thử đã kết thúc");
+  await page
+    .getByRole("button", { name: "Gửi yêu cầu xóa", exact: true })
+    .click();
+  await expect(
+    card.getByText("Yêu cầu xóa đang chờ xử lý", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/seller-ad-request.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Đăng xuất", exact: true }).click();
+  await login(page, "admin@ecom.local");
+  await page.goto("/admin/ads");
+  await page.getByRole("button", { name: /^Yêu cầu xóa/ }).click();
+  await page.getByLabel("Tìm quảng cáo").fill(title);
+  card = page
+    .locator("article")
+    .filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+  await card
+    .getByRole("button", { name: "Từ chối yêu cầu", exact: true })
+    .click();
+  await page
+    .getByLabel("Lý do từ chối", { exact: true })
+    .fill("Vui lòng kiểm tra lại thời hạn chiến dịch");
+  await page.getByRole("button", { name: "Gửi phản hồi", exact: true }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByRole("button", { name: "Tất cả", exact: true }).click();
+  await expect(card).toBeVisible();
+  await card
+    .getByRole("button", { name: `Xóa quảng cáo ${title}`, exact: true })
+    .click();
+  await page.getByRole("button", { name: "Quay lại", exact: true }).click();
+  await expect(card).toBeVisible();
+  await card
+    .getByRole("button", { name: `Xóa quảng cáo ${title}`, exact: true })
+    .click();
+  await page.screenshot({
+    path: "test-results/admin-ad-delete.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Xác nhận xóa", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(card).toHaveCount(0);
+});
+
+test("report handles positive and negative cash flow, large ranges and mobile layout", async ({
+  page,
+}) => {
+  // Isolated display fixture; production continues to read actual database statistics.
+  const series = Array.from({ length: 90 }, (_, i) => ({
+    date: new Date(Date.UTC(2026, 7, 1 + i)).toISOString().slice(0, 10),
+    revenue: i % 18 < 3 ? -450000 : 1200000 + i * 34000,
+  }));
+  await login(page, "admin@ecom.local");
+  await page.route("**/api/admin/statistics?*", (route) =>
+    route.fulfill({
+      json: {
+        range: { from: series[0].date, to: series.at(-1)!.date },
+        totalCollected: 224000000,
+        totalRefunded: 4500000,
+        totalRevenue: 219500000,
+        grossMerchandiseValue: 205000000,
+        pendingRefunds: 450000,
+        totalOrders: 126,
+        ordersByStatus: {
+          PENDING: 10,
+          CONFIRMED: 8,
+          SHIPPING: 12,
+          DELIVERED: 86,
+          CANCELLED: 7,
+          RETURNED: 3,
+        },
+        revenueByDay: series,
+        totalUsers: 248,
+        usersByRole: { CUSTOMER: 222, SELLER: 24, ADMIN: 1, STAFF: 1 },
+        totalShops: 24,
+        shopsByStatus: { APPROVED: 20, PENDING: 4 },
+        topShops: [
+          { shopId: "tech", name: "Tech & Home", revenue: 84000000 },
+          { shopId: "fashion", name: "Phong cách Việt", revenue: 62000000 },
+          { shopId: "beauty", name: "Beauty Corner", revenue: 38000000 },
+        ],
+        voucherStats: [
+          {
+            voucherId: "demo",
+            code: "WELCOME10",
+            discountType: "PERCENT",
+            status: "ACTIVE",
+            usedCount: 48,
+            usageLimit: 100,
+            totalDiscount: 4800000,
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/admin");
+  await expect(page.getByText("219.500.000 ₫", { exact: true })).toBeVisible();
+  await expect(page.getByText("WELCOME10", { exact: true })).toBeVisible();
+  await expect(page.locator('svg [role="button"]').first()).toBeVisible();
+  await page.locator('svg [role="button"]').first().focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator('svg rect[fill="#e9768a"]').first()).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "test-results/admin-report-populated.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    (await page.getByLabel("Từ ngày", { exact: true }).boundingBox())!.width,
+  ).toBeGreaterThan(120);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: "test-results/admin-report-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBeTruthy();
 });
 test("switching sellers clears private cached shop information", async ({
   page,

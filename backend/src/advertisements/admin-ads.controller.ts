@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -12,7 +13,7 @@ import { AdvertisementsService } from './advertisements.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { UpdateAdStatusDto } from './dto/update-ad-status.dto';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { ListAdsQueryDto, RejectAdDeletionDto } from './dto/ad-deletion.dto';
 
 @Controller('admin/ads')
 @UseGuards(RolesGuard)
@@ -21,8 +22,19 @@ export class AdminAdsController {
   constructor(private readonly advertisementsService: AdvertisementsService) {}
 
   @Get()
-  list(@Query() query: PaginationQueryDto) {
+  list(@Query() query: ListAdsQueryDto) {
     return this.advertisementsService.adminList(query);
+  }
+  @Roles(Role.ADMIN)
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.advertisementsService.adminRemove(id);
+  }
+
+  @Roles(Role.ADMIN)
+  @Patch(':id/deletion-request')
+  rejectDeletion(@Param('id') id: string, @Body() dto: RejectAdDeletionDto) {
+    return this.advertisementsService.rejectDeletion(id, dto.note);
   }
 
   @Patch(':id/status')
