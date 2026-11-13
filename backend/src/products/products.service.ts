@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, ProductStatus, ShopStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -6,8 +11,10 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { slugify } from '../common/utils/slugify';
+import { syncProduct, transact } from '../common/commerce';
 
 const PRODUCT_INCLUDE = {
+  variants: { where: { isActive: true }, orderBy: { sku: 'asc' as const } },
   images: { orderBy: { sortOrder: 'asc' as const } },
   category: true,
   shop: { select: { id: true, name: true, status: true } },
@@ -17,7 +24,15 @@ const PRODUCT_INCLUDE = {
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private buildFilterWhere(query: ListProductsQueryDto): Prisma.ProductWhereInput {
+  private buildFilterWhere(
+    query: ListProductsQueryDto,
+  ): Prisma.ProductWhereInput {
+    if (
+      query.minPrice !== undefined &&
+      query.maxPrice !== undefined &&
+      query.minPrice > query.maxPrice
+    )
+      throw new BadRequestException('Giá tối thiểu phải nhỏ hơn giá tối đa');
     return {
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.shopId ? { shopId: query.shopId } : {}),
@@ -36,7 +51,9 @@ export class ProductsService {
    * Accent-insensitive + typo-tolerant product id lookup (backed by the
    * immutable_unaccent()/pg_trgm index), so "ao thun" still matches "Áo thun".
    */
-  private async searchFilter(search?: string): Promise<Prisma.ProductWhereInput> {
+  private async searchFilter(
+    search?: string,
+  ): Promise<Prisma.ProductWhereInput> {
     const q = search?.trim();
     if (!q) return {};
 
@@ -69,7 +86,12 @@ export class ProductsService {
         include: PRODUCT_INCLUDE,
         skip: (page - 1) * pageSize,
         take: pageSize,
-        orderBy: { createdAt: 'desc' },
+        orderBy:
+          query.sort === 'price_asc'
+            ? [{ price: 'asc' }, { id: 'asc' }]
+            : query.sort === 'price_desc'
+              ? [{ price: 'desc' }, { id: 'asc' }]
+              : [{ createdAt: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.product.count({ where }),
     ]);
@@ -108,7 +130,11 @@ export class ProductsService {
       where: { id },
       include: PRODUCT_INCLUDE,
     });
-    if (!product || product.status !== ProductStatus.ACTIVE || product.shop.status !== ShopStatus.APPROVED) {
+    if (
+      !product ||
+      product.status !== ProductStatus.ACTIVE ||
+      product.shop.status !== ShopStatus.APPROVED
+    ) {
       throw new NotFoundException('Không tìm thấy sản phẩm');
     }
     return product;
@@ -158,11 +184,14 @@ export class ProductsService {
   async create(ownerId: string, dto: CreateProductDto) {
     const shop = await this.getOwnedShopOrThrow(ownerId);
     if (shop.status !== ShopStatus.APPROVED) {
-      throw new ForbiddenException('Shop của bạn chưa được duyệt, chưa thể đăng sản phẩm');
+      throw new ForbiddenException(
+        'Shop của bạn chưa được duyệt, chưa thể đăng sản phẩm',
+      );
     }
 
     const slug = await this.uniqueSlug(dto.name);
-    const { images, ...rest } = dto;
+    const { images, variants, ...rest } = dto;
+    const rows = this.variantRows(variants, dto.price, dto.stock);
 
     return this.prisma.product.create({
       data: {
@@ -170,6 +199,9 @@ export class ProductsService {
         slug,
         shopId: shop.id,
         status: dto.status ?? ProductStatus.ACTIVE,
+        price: Math.min(...rows.map((v) => v.price)),
+        stock: rows.reduce((s, v) => s + v.stock, 0),
+        variants: { create: rows },
         images: images?.length
           ? { create: images.map((url, index) => ({ url, sortOrder: index })) }
           : undefined,
@@ -180,7 +212,9 @@ export class ProductsService {
 
   private async getOwnedProductOrThrow(ownerId: string, productId: string) {
     const shop = await this.getOwnedShopOrThrow(ownerId);
-    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
     if (!product || product.shopId !== shop.id) {
       throw new NotFoundException('Không tìm thấy sản phẩm');
     }
@@ -188,29 +222,78 @@ export class ProductsService {
   }
 
   async update(ownerId: string, productId: string, dto: UpdateProductDto) {
-    await this.getOwnedProductOrThrow(ownerId, productId);
-    const { images, ...rest } = dto;
-
-    return this.prisma.product.update({
-      where: { id: productId },
-      data: {
-        ...rest,
-        ...(images
-          ? {
-              images: {
-                deleteMany: {},
-                create: images.map((url, index) => ({ url, sortOrder: index })),
-              },
-            }
-          : {}),
-      },
-      include: PRODUCT_INCLUDE,
+    const product = await this.getOwnedProductOrThrow(ownerId, productId);
+    if (product.status === 'HIDDEN' && dto.status && dto.status !== 'HIDDEN')
+      throw new ForbiddenException('Sản phẩm bị ẩn cần quản trị viên kiểm tra');
+    const shop = await this.getOwnedShopOrThrow(ownerId);
+    if (shop.status !== 'APPROVED')
+      throw new ForbiddenException('Shop chưa được duyệt hoặc đã bị khóa');
+    const { images, variants, ...rest } = dto;
+    return transact(this.prisma, async (tx) => {
+      if (variants) {
+        const rows = this.variantRows(
+          variants,
+          dto.price ?? Number(product.price),
+          dto.stock ?? product.stock,
+        );
+        for (const row of rows)
+          await tx.productVariant.upsert({
+            where: { productId_sku: { productId, sku: row.sku } },
+            update: { ...row, isActive: true },
+            create: { ...row, productId },
+          });
+        await tx.productVariant.updateMany({
+          where: { productId, sku: { notIn: rows.map((v) => v.sku) } },
+          data: { isActive: false },
+        });
+      } else if (dto.price !== undefined || dto.stock !== undefined) {
+        const active = await tx.productVariant.findMany({
+          where: { productId, isActive: true },
+        });
+        if (active.length === 1)
+          await tx.productVariant.update({
+            where: { id: active[0].id },
+            data: { price: dto.price, stock: dto.stock },
+          });
+        else
+          throw new BadRequestException(
+            'Vui lòng cập nhật giá và kho trong từng phân loại',
+          );
+      }
+      await tx.product.update({
+        where: { id: productId },
+        data: {
+          ...rest,
+          ...(images
+            ? {
+                images: {
+                  deleteMany: {},
+                  create: images.map((url, index) => ({
+                    url,
+                    sortOrder: index,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: PRODUCT_INCLUDE,
+      });
+      await syncProduct(tx, productId);
+      return tx.product.findUniqueOrThrow({
+        where: { id: productId },
+        include: PRODUCT_INCLUDE,
+      });
     });
   }
 
   async remove(ownerId: string, productId: string) {
-    await this.getOwnedProductOrThrow(ownerId, productId);
-    await this.prisma.product.delete({ where: { id: productId } });
+    const product = await this.getOwnedProductOrThrow(ownerId, productId);
+    if (product.status === 'HIDDEN')
+      throw new ForbiddenException('Sản phẩm bị ẩn cần quản trị viên kiểm tra');
+    await this.prisma.product.update({
+      where: { id: productId },
+      data: { status: 'DRAFT' },
+    });
     return { success: true };
   }
 
@@ -234,6 +317,31 @@ export class ProductsService {
     ]);
 
     return { items, total, page, pageSize };
+  }
+
+  private variantRows(
+    variants: CreateProductDto['variants'],
+    price: number,
+    stock: number,
+  ) {
+    const rows = variants?.length
+      ? variants.map(({ sku, name, price, stock }) => ({
+          sku: sku.trim().toUpperCase(),
+          name: name.trim(),
+          price,
+          stock,
+        }))
+      : [{ sku: 'DEFAULT', name: 'Mặc định', price, stock }];
+    if (
+      new Set(rows.map((v) => v.sku)).size !== rows.length ||
+      rows.some(
+        (v) => !v.sku || !v.name || v.price < 1 || !Number.isInteger(v.price),
+      )
+    )
+      throw new BadRequestException(
+        'SKU phải duy nhất, giá là số nguyên VNĐ lớn hơn 0',
+      );
+    return rows;
   }
 
   async adminUpdateStatus(id: string, dto: UpdateProductStatusDto) {

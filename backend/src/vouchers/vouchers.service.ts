@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DiscountType, Prisma, VoucherScope } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
@@ -62,8 +66,15 @@ export class VouchersService {
     return this.update(id, dto);
   }
 
-  private async create(dto: CreateVoucherDto, scope: VoucherScope, shopId: string | null) {
-    const existing = await this.prisma.voucher.findUnique({ where: { code: dto.code } });
+  private async create(
+    dto: CreateVoucherDto,
+    scope: VoucherScope,
+    shopId: string | null,
+  ) {
+    this.checkValues(dto);
+    const existing = await this.prisma.voucher.findUnique({
+      where: { code: dto.code.trim().toUpperCase() },
+    });
     if (existing) throw new BadRequestException('Mã voucher đã tồn tại');
 
     if (new Date(dto.startAt) >= new Date(dto.endAt)) {
@@ -72,7 +83,7 @@ export class VouchersService {
 
     return this.prisma.voucher.create({
       data: {
-        code: dto.code.toUpperCase(),
+        code: dto.code.trim().toUpperCase(),
         scope,
         shopId,
         discountType: dto.discountType,
@@ -88,15 +99,27 @@ export class VouchersService {
   }
 
   private async update(id: string, dto: UpdateVoucherDto) {
+    const existing = await this.prisma.voucher.findUniqueOrThrow({
+      where: { id },
+    });
+    this.checkValues({ ...existing, ...dto });
     return this.prisma.voucher.update({
       where: { id },
       data: {
         ...(dto.discountType ? { discountType: dto.discountType } : {}),
-        ...(dto.discountValue !== undefined ? { discountValue: dto.discountValue } : {}),
-        ...(dto.maxDiscountAmount !== undefined ? { maxDiscountAmount: dto.maxDiscountAmount } : {}),
-        ...(dto.minOrderAmount !== undefined ? { minOrderAmount: dto.minOrderAmount } : {}),
+        ...(dto.discountValue !== undefined
+          ? { discountValue: dto.discountValue }
+          : {}),
+        ...(dto.maxDiscountAmount !== undefined
+          ? { maxDiscountAmount: dto.maxDiscountAmount }
+          : {}),
+        ...(dto.minOrderAmount !== undefined
+          ? { minOrderAmount: dto.minOrderAmount }
+          : {}),
         ...(dto.usageLimit !== undefined ? { usageLimit: dto.usageLimit } : {}),
-        ...(dto.perUserLimit !== undefined ? { perUserLimit: dto.perUserLimit } : {}),
+        ...(dto.perUserLimit !== undefined
+          ? { perUserLimit: dto.perUserLimit }
+          : {}),
         ...(dto.startAt ? { startAt: dto.startAt } : {}),
         ...(dto.endAt ? { endAt: dto.endAt } : {}),
         ...(dto.status ? { status: dto.status } : {}),
@@ -109,7 +132,9 @@ export class VouchersService {
     const pageSize = query.pageSize ?? 20;
     const where: Prisma.VoucherWhereInput = {
       ...(query.shopId ? { shopId: query.shopId } : {}),
-      ...(query.search ? { code: { contains: query.search, mode: 'insensitive' as const } } : {}),
+      ...(query.search
+        ? { code: { contains: query.search, mode: 'insensitive' as const } }
+        : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -126,14 +151,20 @@ export class VouchersService {
   }
 
   private computeDiscount(
-    voucher: { discountType: DiscountType; discountValue: Prisma.Decimal | number | string; maxDiscountAmount: Prisma.Decimal | number | string | null },
+    voucher: {
+      discountType: DiscountType;
+      discountValue: Prisma.Decimal | number | string;
+      maxDiscountAmount: Prisma.Decimal | number | string | null;
+    },
     baseAmount: number,
   ): number {
     if (voucher.discountType === DiscountType.FIXED) {
       return Math.min(Number(voucher.discountValue), baseAmount);
     }
     const raw = (baseAmount * Number(voucher.discountValue)) / 100;
-    const capped = voucher.maxDiscountAmount ? Math.min(raw, Number(voucher.maxDiscountAmount)) : raw;
+    const capped = voucher.maxDiscountAmount
+      ? Math.min(raw, Number(voucher.maxDiscountAmount))
+      : raw;
     return Math.min(capped, baseAmount);
   }
 
@@ -141,14 +172,19 @@ export class VouchersService {
     code: string,
     customerId: string,
     cartItems: CartLine[],
+    db: Prisma.TransactionClient = this.prisma,
   ): Promise<VoucherApplication> {
     if (cartItems.length === 0) {
       throw new BadRequestException('Giỏ hàng đang trống');
     }
 
-    const voucher = await this.prisma.voucher.findUnique({ where: { code: code.toUpperCase() } });
+    const voucher = await db.voucher.findUnique({
+      where: { code: code.trim().toUpperCase() },
+    });
     if (!voucher || voucher.status !== 'ACTIVE') {
-      throw new NotFoundException('Mã voucher không tồn tại hoặc đã bị vô hiệu hóa');
+      throw new NotFoundException(
+        'Mã voucher không tồn tại hoặc đã bị vô hiệu hóa',
+      );
     }
 
     const now = new Date();
@@ -157,7 +193,7 @@ export class VouchersService {
     }
 
     if (voucher.usageLimit !== null) {
-      const usedCount = await this.prisma.voucherRedemption.count({
+      const usedCount = await db.voucherRedemption.count({
         where: { voucherId: voucher.id },
       });
       if (usedCount >= voucher.usageLimit) {
@@ -166,7 +202,7 @@ export class VouchersService {
     }
 
     if (voucher.perUserLimit !== null) {
-      const usedByUser = await this.prisma.voucherRedemption.count({
+      const usedByUser = await db.voucherRedemption.count({
         where: { voucherId: voucher.id, userId: customerId },
       });
       if (usedByUser >= voucher.perUserLimit) {
@@ -176,9 +212,13 @@ export class VouchersService {
 
     let baseAmount: number;
     if (voucher.scope === VoucherScope.SHOP) {
-      const shopItems = cartItems.filter((item) => item.product.shopId === voucher.shopId);
+      const shopItems = cartItems.filter(
+        (item) => item.product.shopId === voucher.shopId,
+      );
       if (shopItems.length === 0) {
-        throw new BadRequestException('Giỏ hàng không có sản phẩm của shop áp dụng mã này');
+        throw new BadRequestException(
+          'Giỏ hàng không có sản phẩm của shop áp dụng mã này',
+        );
       }
       baseAmount = shopItems.reduce(
         (sum, item) => sum + Number(item.product.price) * item.quantity,
@@ -197,7 +237,9 @@ export class VouchersService {
       );
     }
 
-    const discountAmount = this.computeDiscount(voucher, baseAmount);
+    const discountAmount = Math.round(
+      this.computeDiscount(voucher, baseAmount),
+    );
 
     return {
       voucherId: voucher.id,
@@ -215,7 +257,10 @@ export class VouchersService {
         status: 'ACTIVE',
         startAt: { lte: now },
         endAt: { gte: now },
-        OR: [{ scope: VoucherScope.PLATFORM }, { scope: VoucherScope.SHOP, shopId }],
+        OR: [
+          { scope: VoucherScope.PLATFORM },
+          { scope: VoucherScope.SHOP, shopId },
+        ],
       },
       orderBy: { discountValue: 'desc' },
       take: 5,
@@ -225,8 +270,30 @@ export class VouchersService {
   async validateForCustomer(customerId: string, code: string) {
     const cartItems = await this.prisma.cartItem.findMany({
       where: { userId: customerId },
-      include: { product: { select: { price: true, shopId: true } } },
+      include: {
+        variant: true,
+        product: { select: { price: true, shopId: true } },
+      },
     });
-    return this.findValidVoucher(code, customerId, cartItems);
+    return this.findValidVoucher(
+      code,
+      customerId,
+      cartItems.map((i) => ({
+        ...i,
+        product: { ...i.product, price: i.variant.price },
+      })),
+    );
+  }
+
+  private checkValues(dto: {
+    discountType: DiscountType;
+    discountValue: unknown;
+    startAt: string | Date;
+    endAt: string | Date;
+  }) {
+    if (dto.discountType === 'PERCENT' && Number(dto.discountValue) > 100)
+      throw new BadRequestException('Phần trăm giảm giá không vượt quá 100');
+    if (new Date(dto.startAt) >= new Date(dto.endAt))
+      throw new BadRequestException('Ngày bắt đầu phải trước ngày kết thúc');
   }
 }

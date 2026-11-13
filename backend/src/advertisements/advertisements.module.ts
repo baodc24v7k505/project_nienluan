@@ -7,7 +7,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [NotificationsModule],
-  controllers: [AdvertisementsController, SellerAdsController, AdminAdsController],
+  controllers: [
+    AdvertisementsController,
+    SellerAdsController,
+    AdminAdsController,
+  ],
   providers: [AdvertisementsService],
 })
 export class AdvertisementsModule {}

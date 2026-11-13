@@ -1,8 +1,13 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { slugify } from '../common/utils/slugify';
+import { transact } from '../common/commerce';
 
 @Injectable()
 export class CategoriesService {
@@ -40,16 +45,25 @@ export class CategoriesService {
   }
 
   async update(id: string, dto: UpdateCategoryDto) {
-    await this.findOne(id);
-    if (dto.parentId === id) {
-      throw new ConflictException('Danh mục không thể là cha của chính nó');
-    }
-    if (dto.parentId) {
-      await this.findOne(dto.parentId);
-    }
-    return this.prisma.category.update({
-      where: { id },
-      data: { name: dto.name, parentId: dto.parentId },
+    return transact(this.prisma, async (tx) => {
+      if (!(await tx.category.findUnique({ where: { id } })))
+        throw new NotFoundException('Không tìm thấy danh mục');
+      let parentId = dto.parentId;
+      const seen = new Set([id]);
+      while (parentId) {
+        if (seen.has(parentId))
+          throw new ConflictException('Danh mục cha tạo thành vòng lặp');
+        seen.add(parentId);
+        const parent = await tx.category.findUnique({
+          where: { id: parentId },
+        });
+        if (!parent) throw new NotFoundException('Không tìm thấy danh mục cha');
+        parentId = parent.parentId ?? undefined;
+      }
+      return tx.category.update({
+        where: { id },
+        data: { name: dto.name, parentId: dto.parentId },
+      });
     });
   }
 

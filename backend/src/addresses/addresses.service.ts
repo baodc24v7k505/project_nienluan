@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
+import { transact } from '../common/commerce';
 
 @Injectable()
 export class AddressesService {
@@ -23,23 +24,48 @@ export class AddressesService {
   }
 
   async create(userId: string, dto: CreateAddressDto) {
-    if (dto.isDefault) {
-      await this.prisma.address.updateMany({ where: { userId }, data: { isDefault: false } });
-    }
-    return this.prisma.address.create({ data: { ...dto, userId } });
+    return transact(this.prisma, async (tx) => {
+      if (dto.isDefault) {
+        await tx.address.updateMany({
+          where: { userId },
+          data: { isDefault: false },
+        });
+      }
+      return tx.address.create({ data: { ...dto, userId } });
+    });
   }
 
   async update(userId: string, id: string, dto: UpdateAddressDto) {
-    await this.getOwnedOrThrow(userId, id);
-    if (dto.isDefault) {
-      await this.prisma.address.updateMany({ where: { userId }, data: { isDefault: false } });
-    }
-    return this.prisma.address.update({ where: { id }, data: dto });
+    return transact(this.prisma, async (tx) => {
+      if (!(await tx.address.findFirst({ where: { id, userId } })))
+        throw new NotFoundException('Không tìm thấy địa chỉ');
+      if (dto.isDefault) {
+        await tx.address.updateMany({
+          where: { userId },
+          data: { isDefault: false },
+        });
+      }
+      return tx.address.update({ where: { id }, data: dto });
+    });
   }
 
   async remove(userId: string, id: string) {
-    await this.getOwnedOrThrow(userId, id);
-    await this.prisma.address.delete({ where: { id } });
-    return { success: true };
+    return transact(this.prisma, async (tx) => {
+      const address = await tx.address.findFirst({ where: { id, userId } });
+      if (!address) throw new NotFoundException('Không tìm thấy địa chỉ');
+      await tx.address.delete({ where: { id } });
+      if (address.isDefault) {
+        const next = await tx.address.findFirst({
+          where: { userId },
+          orderBy: { id: 'asc' },
+        });
+        if (next)
+          await tx.address.update({
+            where: { id: next.id },
+            data: { isDefault: true },
+          });
+      }
+      return { success: true };
+    });
   }
 }

@@ -76,7 +76,12 @@ async function main() {
       stock: 50,
       status: ProductStatus.ACTIVE,
       images: {
-        create: [{ url: 'https://placehold.co/600x400?text=Tai+Nghe+X1', sortOrder: 0 }],
+        create: [
+          {
+            url: 'https://placehold.co/600x400?text=Tai+Nghe+X1',
+            sortOrder: 0,
+          },
+        ],
       },
     },
   });
@@ -94,11 +99,26 @@ async function main() {
       stock: 200,
       status: ProductStatus.ACTIVE,
       images: {
-        create: [{ url: 'https://placehold.co/600x400?text=Ao+Thun', sortOrder: 0 }],
+        create: [
+          { url: 'https://placehold.co/600x400?text=Ao+Thun', sortOrder: 0 },
+        ],
       },
     },
   });
 
+  for (const product of await prisma.product.findMany({
+    where: { variants: { none: {} } },
+  })) {
+    await prisma.productVariant.create({
+      data: {
+        productId: product.id,
+        sku: 'DEFAULT',
+        name: 'Mặc định',
+        price: product.price,
+        stock: product.stock,
+      },
+    });
+  }
   console.log('Seed hoàn tất:');
   console.log('  Admin:    admin@ecom.local / password123');
   console.log('  Seller:   seller@ecom.local / password123');

@@ -5,7 +5,11 @@ import { AdminProductsController } from './admin-products.controller';
 import { ProductsService } from './products.service';
 
 @Module({
-  controllers: [ProductsController, SellerProductsController, AdminProductsController],
+  controllers: [
+    ProductsController,
+    SellerProductsController,
+    AdminProductsController,
+  ],
   providers: [ProductsService],
 })
 export class ProductsModule {}

@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Patch,
   Req,
   Res,
   UseGuards,
@@ -18,6 +19,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import type { AuthUser } from './types/auth-user.type';
+import { ChangePasswordDto, ProfileDto } from './dto/profile.dto';
 
 const REFRESH_COOKIE = 'refresh_token';
 
@@ -29,7 +31,8 @@ export class AuthController {
   ) {}
 
   private setRefreshCookie(res: Response, token: string) {
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
     res.cookie(REFRESH_COOKIE, token, {
       httpOnly: true,
       // Cross-site cookies (frontend/backend on different domains in production)
@@ -50,9 +53,16 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const user = await this.authService.validateUser(dto.email, dto.password);
-    const { accessToken, refreshToken, user: safeUser } = await this.authService.issueTokens(user);
+    const {
+      accessToken,
+      refreshToken,
+      user: safeUser,
+    } = await this.authService.issueTokens(user);
     this.setRefreshCookie(res, refreshToken);
     return { accessToken, user: safeUser };
   }
@@ -60,13 +70,17 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const rawRefreshToken = req.cookies?.[REFRESH_COOKIE];
-    if (!rawRefreshToken) {
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const rawRefreshToken: unknown = req.cookies?.[REFRESH_COOKIE];
+    if (typeof rawRefreshToken !== 'string' || !rawRefreshToken) {
       res.status(HttpStatus.UNAUTHORIZED);
       return { message: 'Thiếu refresh token' };
     }
-    const { accessToken, refreshToken, user } = await this.authService.refreshTokens(rawRefreshToken);
+    const { accessToken, refreshToken, user } =
+      await this.authService.refreshTokens(rawRefreshToken);
     this.setRefreshCookie(res, refreshToken);
     return { accessToken, user };
   }
@@ -75,9 +89,12 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const rawRefreshToken = req.cookies?.[REFRESH_COOKIE];
-    await this.authService.logout(rawRefreshToken);
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const rawRefreshToken: unknown = req.cookies?.[REFRESH_COOKIE];
+    await this.authService.logout(
+      typeof rawRefreshToken === 'string' ? rawRefreshToken : undefined,
+    );
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
     res.clearCookie(REFRESH_COOKIE, {
       path: '/api/auth',
       sameSite: isProduction ? 'none' : 'lax',
@@ -90,5 +107,19 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
     return this.authService.me(user.id);
+  }
+
+  @Patch('profile')
+  profile(@CurrentUser() user: AuthUser, @Body() dto: ProfileDto) {
+    return this.authService.updateProfile(user.id, dto);
+  }
+
+  @Post('password')
+  password(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(
+      user.id,
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
 }

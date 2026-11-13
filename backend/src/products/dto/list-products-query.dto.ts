@@ -1,8 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 export class ListProductsQueryDto extends PaginationQueryDto {
+  @IsOptional() @IsIn(['newest', 'price_asc', 'price_desc']) sort?:
+    'newest' | 'price_asc' | 'price_desc';
   @IsOptional()
   @IsString()
   categoryId?: string;

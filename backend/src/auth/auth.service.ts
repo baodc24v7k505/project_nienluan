@@ -11,7 +11,6 @@ import { createHash, randomUUID } from 'crypto';
 import { Role, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
-import { AuthUser } from './types/auth-user.type';
 
 interface RefreshPayload {
   sub: string;
@@ -27,8 +26,16 @@ export class AuthService {
   ) {}
 
   private sanitize(user: User) {
-    const { passwordHash: _passwordHash, ...rest } = user;
-    return rest;
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      role: user.role,
+      status: user.status,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 
   private hashToken(token: string): string {
@@ -36,7 +43,9 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (existing) {
       throw new ConflictException('Email đã được sử dụng');
     }
@@ -75,16 +84,24 @@ export class AuthService {
   }
 
   private signAccessToken(user: User): string {
-    const payload: AuthUser = { id: user.id, email: user.email, role: user.role };
+    const payload = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      tokenVersion: user.tokenVersion,
+    };
     return this.jwtService.sign(payload as unknown as Record<string, unknown>, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') as never,
+      expiresIn: this.configService.get<string>(
+        'JWT_ACCESS_EXPIRES_IN',
+      ) as never,
     });
   }
 
   private async signRefreshToken(userId: string): Promise<string> {
     const jti = randomUUID();
-    const expiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';
+    const expiresIn =
+      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';
     const token = this.jwtService.sign(
       { sub: userId, jti },
       {
@@ -94,7 +111,9 @@ export class AuthService {
     );
 
     const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + this.parseExpiresInSeconds(expiresIn));
+    expiresAt.setSeconds(
+      expiresAt.getSeconds() + this.parseExpiresInSeconds(expiresIn),
+    );
 
     await this.prisma.refreshToken.create({
       data: {
@@ -113,7 +132,12 @@ export class AuthService {
     if (!match) return 7 * 24 * 60 * 60;
     const amount = Number(match[1]);
     const unit = match[2];
-    const multipliers: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+    const multipliers: Record<string, number> = {
+      s: 1,
+      m: 60,
+      h: 3600,
+      d: 86400,
+    };
     return amount * multipliers[unit];
   }
 
@@ -133,17 +157,31 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token không hợp lệ');
     }
 
-    const stored = await this.prisma.refreshToken.findUnique({ where: { id: payload.jti } });
-    if (!stored || stored.expiresAt < new Date() || stored.tokenHash !== this.hashToken(rawRefreshToken)) {
-      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { id: payload.jti },
+    });
+    if (
+      !stored ||
+      stored.expiresAt < new Date() ||
+      stored.tokenHash !== this.hashToken(rawRefreshToken)
+    ) {
+      throw new UnauthorizedException(
+        'Refresh token không hợp lệ hoặc đã hết hạn',
+      );
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
     if (!user || user.status === 'BANNED') {
       throw new ForbiddenException('Tài khoản không khả dụng');
     }
 
-    await this.prisma.refreshToken.delete({ where: { id: payload.jti } });
+    const consumed = await this.prisma.refreshToken.deleteMany({
+      where: { id: payload.jti },
+    });
+    if (!consumed.count)
+      throw new UnauthorizedException('Refresh token đã được sử dụng');
 
     return this.issueTokens(user);
   }
@@ -164,5 +202,35 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new UnauthorizedException();
     return this.sanitize(user);
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: { fullName: string; phone?: string },
+  ) {
+    return this.sanitize(
+      await this.prisma.user.update({ where: { id: userId }, data: dto }),
+    );
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+    });
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash)))
+      throw new UnauthorizedException('Mật khẩu hiện tại không đúng');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId, passwordHash: user.passwordHash },
+        data: { passwordHash, tokenVersion: { increment: 1 } },
+      }),
+      this.prisma.refreshToken.deleteMany({ where: { userId } }),
+    ]);
+    return { success: true };
   }
 }

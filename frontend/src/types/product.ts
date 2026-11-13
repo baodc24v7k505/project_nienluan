@@ -1,4 +1,4 @@
-export type ProductStatus = 'DRAFT' | 'ACTIVE' | 'HIDDEN';
+export type ProductStatus = "DRAFT" | "ACTIVE" | "HIDDEN";
 
 export interface Category {
   id: string;
@@ -14,6 +14,7 @@ export interface ProductImage {
 }
 
 export interface Product {
+  variants: ProductVariant[];
   id: string;
   shopId: string;
   categoryId: string | null;
@@ -28,4 +29,13 @@ export interface Product {
   images: ProductImage[];
   category: Category | null;
   shop: { id: string; name: string; status: string };
+}
+
+export interface ProductVariant {
+  id: string;
+  sku: string;
+  name: string;
+  price: string;
+  stock: number;
+  isActive: boolean;
 }

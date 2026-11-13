@@ -9,7 +9,10 @@ export class ProductReviewsController {
 
   @Public()
   @Get()
-  findByProduct(@Param('productId') productId: string, @Query() query: PaginationQueryDto) {
+  findByProduct(
+    @Param('productId') productId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
     return this.reviewsService.findByProduct(productId, query);
   }
 }

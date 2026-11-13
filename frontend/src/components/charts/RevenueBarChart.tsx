@@ -1,24 +1,30 @@
-import { useState } from 'react';
-import { formatVnd } from '../../lib/format';
+import { useState } from "react";
+import { formatVnd } from "../../lib/format";
 
 interface RevenuePoint {
   date: string;
   revenue: number;
 }
 
-const BAR_FILL = '#2a78d6';
-const GRIDLINE = '#e1e0d9';
-const BASELINE = '#c3c2b7';
-const MUTED = '#898781';
+const BAR_FILL = "#2a78d6";
+const GRIDLINE = "#e1e0d9";
+const BASELINE = "#c3c2b7";
+const MUTED = "#898781";
 
-function roundedTopBarPath(x: number, y: number, width: number, height: number, radius: number) {
+function roundedTopBarPath(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
   const r = Math.min(radius, width / 2, Math.max(height, 0));
-  if (height <= 0) return '';
+  if (height <= 0) return "";
   return `M${x},${y + height} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} Z`;
 }
 
 function formatDayLabel(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(dateStr + "T00:00:00");
   return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
@@ -35,6 +41,11 @@ export function RevenueBarChart({ data }: { data: RevenuePoint[] }) {
   const plotHeight = height - paddingTop - paddingBottom;
 
   const maxRevenue = Math.max(1, ...data.map((d) => d.revenue));
+  const minRevenue = Math.min(0, ...data.map((d) => d.revenue));
+  const valueY = (value: number) =>
+    paddingTop +
+    ((maxRevenue - value) / (maxRevenue - minRevenue)) * plotHeight;
+  const zeroY = valueY(0);
   const barGap = 2;
   const barWidth = data.length > 0 ? plotWidth / data.length - barGap : 0;
 
@@ -66,15 +77,15 @@ export function RevenueBarChart({ data }: { data: RevenuePoint[] }) {
         <line
           x1={paddingLeft}
           x2={width - paddingRight}
-          y1={paddingTop + plotHeight}
-          y2={paddingTop + plotHeight}
+          y1={zeroY}
+          y2={zeroY}
           stroke={BASELINE}
           strokeWidth={1}
         />
         {data.map((d, i) => {
-          const barHeight = (d.revenue / maxRevenue) * plotHeight;
+          const barHeight = Math.abs(valueY(d.revenue) - zeroY);
           const x = paddingLeft + i * (barWidth + barGap);
-          const y = paddingTop + plotHeight - barHeight;
+          const y = Math.min(valueY(d.revenue), zeroY);
           const showLabel = data.length <= 10 || i % 2 === 0;
           return (
             <g key={d.date}>
@@ -117,8 +128,12 @@ export function RevenueBarChart({ data }: { data: RevenuePoint[] }) {
             top: `${(paddingTop / height) * 100}%`,
           }}
         >
-          <p className="font-medium text-slate-900">{formatDayLabel(data[hoverIndex].date)}</p>
-          <p className="text-slate-600">{formatVnd(data[hoverIndex].revenue)}</p>
+          <p className="font-medium text-slate-900">
+            {formatDayLabel(data[hoverIndex].date)}
+          </p>
+          <p className="text-slate-600">
+            {formatVnd(data[hoverIndex].revenue)}
+          </p>
         </div>
       )}
     </div>

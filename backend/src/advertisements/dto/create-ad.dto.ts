@@ -1,4 +1,10 @@
-import { IsDateString, IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MinLength,
+} from 'class-validator';
 
 export class CreateAdDto {
   @IsString()

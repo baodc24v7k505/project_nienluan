@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ShopStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -82,7 +86,9 @@ export class ShopsService {
         skip: (page - 1) * pageSize,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
-        include: { owner: { select: { id: true, email: true, fullName: true } } },
+        include: {
+          owner: { select: { id: true, email: true, fullName: true } },
+        },
       }),
       this.prisma.shop.count({ where }),
     ]);

@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '../store/auth.store';
-import { connectSocket, disconnectSocket } from './socket';
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuthStore } from "../store/auth.store";
+import { connectSocket, disconnectSocket } from "./socket";
+import { refreshAccessToken } from "../api/client";
 
 export function useRealtimeConnection() {
   const user = useAuthStore((s) => s.user);
@@ -17,13 +18,18 @@ export function useRealtimeConnection() {
     const socket = connectSocket(accessToken);
 
     const handleNewNotification = () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     };
 
-    socket.on('notification:new', handleNewNotification);
+    socket.on("notification:new", handleNewNotification);
+    const reconnect = (reason: string) => {
+      if (reason === "io server disconnect") void refreshAccessToken();
+    };
+    socket.on("disconnect", reconnect);
 
     return () => {
-      socket.off('notification:new', handleNewNotification);
+      socket.off("notification:new", handleNewNotification);
+      socket.off("disconnect", reconnect);
     };
   }, [user, accessToken, queryClient]);
 }

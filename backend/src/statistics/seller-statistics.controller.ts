@@ -5,6 +5,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/types/auth-user.type';
+import { StatisticsQueryDto } from './statistics-query.dto';
 
 @Controller('seller/statistics')
 @UseGuards(RolesGuard)
@@ -13,7 +14,10 @@ export class SellerStatisticsController {
   constructor(private readonly statisticsService: StatisticsService) {}
 
   @Get()
-  getStatistics(@CurrentUser() user: AuthUser, @Query('days') days?: string) {
-    return this.statisticsService.getSellerStatistics(user.id, days ? Number(days) : undefined);
+  getStatistics(
+    @CurrentUser() user: AuthUser,
+    @Query() query: StatisticsQueryDto,
+  ) {
+    return this.statisticsService.getSellerStatistics(user.id, query);
   }
 }

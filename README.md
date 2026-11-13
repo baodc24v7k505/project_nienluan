@@ -1,5 +1,7 @@
 # Sàn thương mại điện tử (Niên luận)
 
+> Bản nâng cấp tiểu luận ngày 13/11/2026: xem [chức năng và dữ liệu demo](docs/PHIEN_BAN_TIEU_LUAN.md) cùng [hướng dẫn kiểm thử/redeploy](docs/KIEM_THU_VA_TRIEN_KHAI.md). Các mô tả bên dưới là hướng dẫn của bản niên luận; ưu tiên hai tài liệu mới khi có khác biệt.
+
 Hệ thống thương mại điện tử phong cách Shopee với 3 vai trò:
 
 - **Khách hàng**: tìm kiếm, mua hàng, thanh toán trực tuyến, chat với shop/hỗ trợ, nhận thông báo real-time

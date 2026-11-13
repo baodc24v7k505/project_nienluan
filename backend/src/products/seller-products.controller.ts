@@ -26,7 +26,10 @@ export class SellerProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  findMine(@CurrentUser() user: AuthUser, @Query() query: ListProductsQueryDto) {
+  findMine(
+    @CurrentUser() user: AuthUser,
+    @Query() query: ListProductsQueryDto,
+  ) {
     return this.productsService.findMine(user.id, query);
   }
 

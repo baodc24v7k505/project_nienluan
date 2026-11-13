@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -31,8 +35,15 @@ export class UsersService {
       ...(query.search
         ? {
             OR: [
-              { email: { contains: query.search, mode: 'insensitive' as const } },
-              { fullName: { contains: query.search, mode: 'insensitive' as const } },
+              {
+                email: { contains: query.search, mode: 'insensitive' as const },
+              },
+              {
+                fullName: {
+                  contains: query.search,
+                  mode: 'insensitive' as const,
+                },
+              },
             ],
           }
         : {}),
@@ -57,13 +68,20 @@ export class UsersService {
   }
 
   async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: SAFE_USER_SELECT });
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: SAFE_USER_SELECT,
+    });
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
     return user;
   }
 
   async updateStatus(id: string, dto: UpdateUserStatusDto) {
-    await this.findOne(id);
+    const user = await this.findOne(id);
+    if (user.role === Role.ADMIN)
+      throw new ConflictException('Không thể khóa tài khoản quản trị viên');
+    if (dto.status === 'BANNED')
+      await this.prisma.refreshToken.deleteMany({ where: { userId: id } });
     return this.prisma.user.update({
       where: { id },
       data: { status: dto.status },
@@ -72,7 +90,9 @@ export class UsersService {
   }
 
   async createStaff(dto: CreateStaffDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (existing) throw new ConflictException('Email đã được sử dụng');
 
     const passwordHash = await bcrypt.hash(dto.password, 10);

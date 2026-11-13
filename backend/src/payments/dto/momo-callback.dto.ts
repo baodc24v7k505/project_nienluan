@@ -1,4 +1,5 @@
 import { IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class MomoCallbackDto {
   @IsString()
@@ -11,6 +12,9 @@ export class MomoCallbackDto {
   requestId: string;
 
   @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'number' ? String(value) : value,
+  )
   amount: string;
 
   @IsOptional()
@@ -23,9 +27,15 @@ export class MomoCallbackDto {
 
   @IsOptional()
   @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'number' ? String(value) : value,
+  )
   transId?: string;
 
   @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'number' ? String(value) : value,
+  )
   resultCode: string;
 
   @IsOptional()
@@ -38,6 +48,9 @@ export class MomoCallbackDto {
 
   @IsOptional()
   @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'number' ? String(value) : value,
+  )
   responseTime?: string;
 
   @IsOptional()

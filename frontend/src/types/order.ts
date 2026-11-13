@@ -1,14 +1,10 @@
 export type ShopOrderStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'SHIPPING'
-  | 'DELIVERED'
-  | 'CANCELLED'
-  | 'RETURNED';
+  "PENDING" | "CONFIRMED" | "SHIPPING" | "DELIVERED" | "CANCELLED" | "RETURNED";
 
-export type PaymentMethod = 'COD' | 'MOMO';
-export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED';
-export type CancelledBy = 'CUSTOMER' | 'SELLER' | 'ADMIN';
+export type PaymentMethod = "COD" | "MOMO";
+export type PaymentStatus =
+  "PENDING" | "PAID" | "FAILED" | "PARTIALLY_REFUNDED" | "REFUNDED";
+export type CancelledBy = "CUSTOMER" | "SELLER" | "ADMIN";
 
 export interface Address {
   id: string;
@@ -21,6 +17,15 @@ export interface Address {
 }
 
 export interface CartItem {
+  variantId: string;
+  variant: {
+    id: string;
+    name: string;
+    sku: string;
+    price: string;
+    stock: number;
+    isActive: boolean;
+  };
   id: string;
   userId: string;
   productId: string;
@@ -42,6 +47,8 @@ export interface Cart {
 }
 
 export interface OrderItemLine {
+  variantSnapshot: string | null;
+  skuSnapshot: string | null;
   id: string;
   productId: string;
   nameSnapshot: string;
@@ -51,6 +58,26 @@ export interface OrderItemLine {
 }
 
 export interface ShopOrder {
+  discountAmount: string;
+  shippingFee: string;
+  totalAmount: string;
+  paidAmount: string;
+  carrier: string | null;
+  trackingCode: string | null;
+  deliveredAt: string | null;
+  history: {
+    id: string;
+    status: ShopOrderStatus;
+    note: string | null;
+    createdAt: string;
+  }[];
+  returnRequest: {
+    reason: string;
+    evidenceUrls: string[];
+    status: "REQUESTED" | "APPROVED" | "REJECTED" | "RECEIVED";
+    resolution: string | null;
+  } | null;
+  refunds: Refund[];
   id: string;
   orderId: string;
   shopId: string;
@@ -68,11 +95,18 @@ export interface ShopOrder {
     recipientPhone: string;
     shippingAddress: string;
     paymentMethod: PaymentMethod;
-    customer: { id: string; fullName: string; email: string; phone: string | null };
+    customer: {
+      id: string;
+      fullName: string;
+      email: string;
+      phone: string | null;
+    };
   };
 }
 
 export interface Order {
+  expiresAt: string | null;
+  refunds: Refund[];
   id: string;
   customerId: string;
   recipientName: string;
@@ -86,4 +120,13 @@ export interface Order {
   createdAt: string;
   shopOrders: ShopOrder[];
   payment: { id: string; method: PaymentMethod; status: PaymentStatus } | null;
+}
+
+export interface Refund {
+  id: string;
+  shopOrderId: string | null;
+  amount: string;
+  reason: string;
+  status: "PENDING" | "COMPLETED";
+  reference: string | null;
 }

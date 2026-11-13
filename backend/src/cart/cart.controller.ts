@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CartService } from './cart.service';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -34,7 +43,10 @@ export class CartController {
   }
 
   @Delete(':productId')
-  removeItem(@CurrentUser() user: AuthUser, @Param('productId') productId: string) {
+  removeItem(
+    @CurrentUser() user: AuthUser,
+    @Param('productId') productId: string,
+  ) {
     return this.cartService.removeItem(user.id, productId);
   }
 }

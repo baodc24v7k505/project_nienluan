@@ -6,24 +6,37 @@ export interface RevenuePoint {
 export interface VoucherStat {
   voucherId: string;
   code: string;
-  discountType: 'PERCENT' | 'FIXED';
-  status: 'ACTIVE' | 'INACTIVE';
+  discountType: "PERCENT" | "FIXED";
+  status: "ACTIVE" | "INACTIVE";
   usedCount: number;
   usageLimit: number | null;
   totalDiscount: number;
 }
 
 export interface SellerStatistics {
+  totalCollected: number;
+  totalRefunded: number;
+  grossMerchandiseValue: number;
+  pendingRefunds: number;
   totalRevenue: number;
   totalOrders: number;
   ordersByStatus: Record<string, number>;
   revenueByDay: RevenuePoint[];
-  topProducts: { productId: string; name: string; quantitySold: number; revenue: number }[];
+  topProducts: {
+    productId: string;
+    name: string;
+    quantitySold: number;
+    revenue: number;
+  }[];
   revenueByCategory: { category: string; revenue: number }[];
   voucherStats: VoucherStat[];
 }
 
 export interface AdminStatistics {
+  totalCollected: number;
+  totalRefunded: number;
+  grossMerchandiseValue: number;
+  pendingRefunds: number;
   totalUsers: number;
   usersByRole: Record<string, number>;
   totalShops: number;

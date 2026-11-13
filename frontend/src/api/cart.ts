@@ -1,13 +1,17 @@
-import { apiClient } from './client';
-import type { Cart } from '../types/order';
+import { apiClient } from "./client";
+import type { Cart } from "../types/order";
 
 export async function getCart() {
-  const res = await apiClient.get<Cart>('/cart');
+  const res = await apiClient.get<Cart>("/cart");
   return res.data;
 }
 
-export async function addToCart(productId: string, quantity: number) {
-  const res = await apiClient.post('/cart', { productId, quantity });
+export async function addToCart(
+  productId: string,
+  quantity: number,
+  variantId?: string,
+) {
+  const res = await apiClient.post("/cart", { productId, quantity, variantId });
   return res.data;
 }
 

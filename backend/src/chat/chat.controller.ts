@@ -16,7 +16,10 @@ export class ChatController {
   }
 
   @Post()
-  getOrCreate(@CurrentUser() user: AuthUser, @Body() dto: CreateConversationDto) {
+  getOrCreate(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateConversationDto,
+  ) {
     return this.chatService.getOrCreate(user, dto);
   }
 

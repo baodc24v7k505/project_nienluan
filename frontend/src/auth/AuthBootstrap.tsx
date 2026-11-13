@@ -1,8 +1,20 @@
-import { useEffect } from 'react';
-import { useAuthStore } from '../store/auth.store';
-import { refreshAccessToken } from '../api/client';
+import { useEffect } from "react";
+import { useAuthStore } from "../store/auth.store";
+import { refreshAccessToken } from "../api/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function AuthBootstrap({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+  useEffect(
+    () =>
+      useAuthStore.subscribe((next, previous) => {
+        if (next.user?.id !== previous.user?.id) {
+          void queryClient.cancelQueries();
+          queryClient.clear();
+        }
+      }),
+    [queryClient],
+  );
   const isReady = useAuthStore((s) => s.isReady);
   const setReady = useAuthStore((s) => s.setReady);
 

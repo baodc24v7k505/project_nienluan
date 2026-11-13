@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConversationType, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -6,6 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import type { AuthUser } from '../auth/types/auth-user.type';
+import { transact } from '../common/commerce';
 
 const CONVERSATION_INCLUDE = {
   customer: { select: { id: true, fullName: true, email: true } },
@@ -23,41 +29,51 @@ export class ChatService {
 
   async getOrCreate(user: AuthUser, dto: CreateConversationDto) {
     if (user.role !== Role.CUSTOMER) {
-      throw new ForbiddenException('Chỉ khách hàng mới có thể bắt đầu cuộc trò chuyện');
+      throw new ForbiddenException(
+        'Chỉ khách hàng mới có thể bắt đầu cuộc trò chuyện',
+      );
     }
+    return transact(this.prisma, async (tx) => {
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${user.id}, 1))`;
 
-    if (dto.type === ConversationType.DIRECT) {
-      if (!dto.shopId) throw new BadRequestException('Thiếu shopId');
-      const shop = await this.prisma.shop.findUnique({ where: { id: dto.shopId } });
-      if (!shop) throw new NotFoundException('Không tìm thấy shop');
+      if (dto.type === ConversationType.DIRECT) {
+        if (!dto.shopId) throw new BadRequestException('Thiếu shopId');
+        const shop = await tx.shop.findUnique({ where: { id: dto.shopId } });
+        if (!shop || shop.status !== 'APPROVED')
+          throw new NotFoundException('Không tìm thấy shop');
 
-      const existing = await this.prisma.conversation.findUnique({
-        where: {
-          customerId_shopId_type: {
+        const existing = await tx.conversation.findUnique({
+          where: {
+            customerId_shopId_type: {
+              customerId: user.id,
+              shopId: dto.shopId,
+              type: ConversationType.DIRECT,
+            },
+          },
+          include: CONVERSATION_INCLUDE,
+        });
+        if (existing) return existing;
+
+        return tx.conversation.create({
+          data: {
+            type: ConversationType.DIRECT,
             customerId: user.id,
             shopId: dto.shopId,
-            type: ConversationType.DIRECT,
           },
-        },
+          include: CONVERSATION_INCLUDE,
+        });
+      }
+
+      const existingSupport = await tx.conversation.findFirst({
+        where: { customerId: user.id, type: ConversationType.SUPPORT },
         include: CONVERSATION_INCLUDE,
       });
-      if (existing) return existing;
+      if (existingSupport) return existingSupport;
 
-      return this.prisma.conversation.create({
-        data: { type: ConversationType.DIRECT, customerId: user.id, shopId: dto.shopId },
+      return tx.conversation.create({
+        data: { type: ConversationType.SUPPORT, customerId: user.id },
         include: CONVERSATION_INCLUDE,
       });
-    }
-
-    const existingSupport = await this.prisma.conversation.findFirst({
-      where: { customerId: user.id, type: ConversationType.SUPPORT },
-      include: CONVERSATION_INCLUDE,
-    });
-    if (existingSupport) return existingSupport;
-
-    return this.prisma.conversation.create({
-      data: { type: ConversationType.SUPPORT, customerId: user.id },
-      include: CONVERSATION_INCLUDE,
     });
   }
 
@@ -67,7 +83,9 @@ export class ChatService {
     if (user.role === Role.CUSTOMER) {
       where = { customerId: user.id };
     } else if (user.role === Role.SELLER) {
-      const shop = await this.prisma.shop.findUnique({ where: { ownerId: user.id } });
+      const shop = await this.prisma.shop.findUnique({
+        where: { ownerId: user.id },
+      });
       if (!shop) return [];
       where = { shopId: shop.id };
     } else {
@@ -76,7 +94,14 @@ export class ChatService {
 
     return this.prisma.conversation.findMany({
       where,
-      include: CONVERSATION_INCLUDE,
+      include: {
+        ...CONVERSATION_INCLUDE,
+        _count: {
+          select: {
+            messages: { where: { senderId: { not: user.id }, readAt: null } },
+          },
+        },
+      },
       orderBy: { updatedAt: 'desc' },
     });
   }
@@ -86,7 +111,8 @@ export class ChatService {
       where: { id: conversationId },
       include: { shop: true },
     });
-    if (!conversation) throw new NotFoundException('Không tìm thấy cuộc trò chuyện');
+    if (!conversation)
+      throw new NotFoundException('Không tìm thấy cuộc trò chuyện');
 
     const isCustomer = conversation.customerId === user.id;
     const isShopOwner = conversation.shop?.ownerId === user.id;
@@ -95,26 +121,39 @@ export class ChatService {
       (user.role === Role.ADMIN || user.role === Role.STAFF);
 
     if (!isCustomer && !isShopOwner && !isSupportStaff) {
-      throw new ForbiddenException('Bạn không có quyền truy cập cuộc trò chuyện này');
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập cuộc trò chuyện này',
+      );
     }
     return conversation;
   }
 
-  async getMessages(user: AuthUser, conversationId: string, query: PaginationQueryDto) {
+  async getMessages(
+    user: AuthUser,
+    conversationId: string,
+    query: PaginationQueryDto,
+  ) {
     await this.authorize(user, conversationId);
     const pageSize = query.pageSize ?? 50;
 
     const messages = await this.prisma.message.findMany({
       where: { conversationId },
       include: { sender: { select: { id: true, fullName: true, role: true } } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: pageSize,
+      skip: ((query.page ?? 1) - 1) * pageSize,
+    });
+    await this.prisma.message.updateMany({
+      where: { conversationId, senderId: { not: user.id }, readAt: null },
+      data: { readAt: new Date() },
     });
 
     return messages.reverse();
   }
 
   async sendMessage(user: AuthUser, conversationId: string, body: string) {
+    body = body.trim();
+    if (!body) throw new BadRequestException('Tin nhắn không được để trống');
     const conversation = await this.authorize(user, conversationId);
 
     const message = await this.prisma.message.create({
@@ -127,7 +166,11 @@ export class ChatService {
       data: { updatedAt: new Date() },
     });
 
-    this.realtimeGateway.emitToConversation(conversationId, 'message:new', message);
+    this.realtimeGateway.emitToConversation(
+      conversationId,
+      'message:new',
+      message,
+    );
 
     await this.notifyRecipients(user, conversation, message.body);
 
@@ -136,20 +179,27 @@ export class ChatService {
 
   private async notifyRecipients(
     sender: AuthUser,
-    conversation: { type: ConversationType; customerId: string; shop: { ownerId: string } | null },
+    conversation: {
+      id: string;
+      type: ConversationType;
+      customerId: string;
+      shop: { ownerId: string } | null;
+    },
     body: string,
   ) {
     const preview = body.length > 80 ? `${body.slice(0, 80)}...` : body;
 
     if (conversation.type === ConversationType.DIRECT && conversation.shop) {
       const recipientId =
-        sender.id === conversation.customerId ? conversation.shop.ownerId : conversation.customerId;
+        sender.id === conversation.customerId
+          ? conversation.shop.ownerId
+          : conversation.customerId;
       await this.notificationsService.create({
         userId: recipientId,
         type: 'NEW_MESSAGE',
         title: 'Tin nhắn mới',
         body: preview,
-        link: '/chat',
+        link: `${recipientId === conversation.customerId ? '/chat' : '/seller/chat'}?conversationId=${conversation.id}`,
       });
       return;
     }

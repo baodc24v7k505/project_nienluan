@@ -3,6 +3,7 @@ import { Role } from '@prisma/client';
 import { StatisticsService } from './statistics.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { StatisticsQueryDto } from './statistics-query.dto';
 
 @Controller('admin/statistics')
 @UseGuards(RolesGuard)
@@ -11,7 +12,7 @@ export class AdminStatisticsController {
   constructor(private readonly statisticsService: StatisticsService) {}
 
   @Get()
-  getStatistics(@Query('days') days?: string) {
-    return this.statisticsService.getAdminStatistics(days ? Number(days) : undefined);
+  getStatistics(@Query() query: StatisticsQueryDto) {
+    return this.statisticsService.getAdminStatistics(query);
   }
 }

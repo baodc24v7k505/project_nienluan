@@ -21,7 +21,11 @@ export class NotificationsService {
 
   async create(input: CreateNotificationInput) {
     const notification = await this.prisma.notification.create({ data: input });
-    this.realtimeGateway.emitToUser(input.userId, 'notification:new', notification);
+    this.realtimeGateway.emitToUser(
+      input.userId,
+      'notification:new',
+      notification,
+    );
     return notification;
   }
 
@@ -45,11 +49,16 @@ export class NotificationsService {
   }
 
   async markRead(userId: string, id: string) {
-    const notification = await this.prisma.notification.findUnique({ where: { id } });
+    const notification = await this.prisma.notification.findUnique({
+      where: { id },
+    });
     if (!notification || notification.userId !== userId) {
       throw new NotFoundException('Không tìm thấy thông báo');
     }
-    return this.prisma.notification.update({ where: { id }, data: { isRead: true } });
+    return this.prisma.notification.update({
+      where: { id },
+      data: { isRead: true },
+    });
   }
 
   async markAllRead(userId: string) {

@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { PaymentsService } from './payments.service';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -16,7 +24,10 @@ export class PaymentsController {
   @UseGuards(RolesGuard)
   @Roles(Role.CUSTOMER)
   @Post('momo/create')
-  createMomoPayment(@CurrentUser() user: AuthUser, @Body() dto: CreateMomoPaymentDto) {
+  createMomoPayment(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateMomoPaymentDto,
+  ) {
     return this.paymentsService.createMomoPayment(user.id, dto.orderId);
   }
 
@@ -28,6 +39,7 @@ export class PaymentsController {
 
   @Public()
   @Post('momo/ipn')
+  @HttpCode(204)
   ipn(@Body() dto: MomoCallbackDto) {
     return this.paymentsService.confirmCallback(dto);
   }

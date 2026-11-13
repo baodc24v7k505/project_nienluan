@@ -1,4 +1,4 @@
-export type ConversationType = 'DIRECT' | 'SUPPORT';
+export type ConversationType = "DIRECT" | "SUPPORT";
 
 export interface Message {
   id: string;
@@ -11,6 +11,7 @@ export interface Message {
 }
 
 export interface Conversation {
+  _count?: { messages: number };
   id: string;
   type: ConversationType;
   customerId: string;

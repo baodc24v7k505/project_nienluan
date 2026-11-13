@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AdStatus, ShopStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -29,7 +33,9 @@ export class AdvertisementsService {
   async sellerCreate(ownerId: string, dto: CreateAdDto) {
     const shop = await this.getOwnedShopOrThrow(ownerId);
     if (shop.status !== ShopStatus.APPROVED) {
-      throw new BadRequestException('Shop của bạn chưa được duyệt, chưa thể chạy quảng cáo');
+      throw new BadRequestException(
+        'Shop của bạn chưa được duyệt, chưa thể chạy quảng cáo',
+      );
     }
     if (new Date(dto.startAt) >= new Date(dto.endAt)) {
       throw new BadRequestException('Ngày bắt đầu phải trước ngày kết thúc');
@@ -111,7 +117,11 @@ export class AdvertisementsService {
   async getActive() {
     const now = new Date();
     return this.prisma.advertisement.findMany({
-      where: { status: AdStatus.APPROVED, startAt: { lte: now }, endAt: { gte: now } },
+      where: {
+        status: AdStatus.APPROVED,
+        startAt: { lte: now },
+        endAt: { gte: now },
+      },
       include: { shop: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' },
     });

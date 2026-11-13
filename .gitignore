@@ -3,5 +3,10 @@ dist/
 build/
 .env
 .env.local
+.env.*.local
+.local/
+coverage/
+test-results/
+playwright-report/
 *.log
 .DS_Store

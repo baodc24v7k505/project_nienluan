@@ -1,0 +1,75 @@
+name: Verify marketplace
+on:
+  push:
+    branches: [master]
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ecom_upgrade_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ecom_upgrade_test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ecom_upgrade_test
+      NODE_ENV: test
+      JWT_ACCESS_SECRET: ci-access-test-only
+      JWT_REFRESH_SECRET: ci-refresh-test-only
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      FRONTEND_URL: http://localhost:5173
+      PORT: 3100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm run build
+        working-directory: backend
+      - run: npm test -- --runInBand
+        working-directory: backend
+      - run: npm run lint:check
+        working-directory: backend
+      - run: npm run test:integration
+        working-directory: backend
+      - run: npm run db:seed:demo
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build && npm run lint
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start test API
+        working-directory: backend
+        run: |
+          node dist/src/main.js > /tmp/ecom-backend.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail http://localhost:3100/api; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/ecom-backend.log
+          exit 1
+      - run: npm run test:ui
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results
+          path: frontend/test-results

@@ -5,7 +5,11 @@ import { AdminVouchersController } from './admin-vouchers.controller';
 import { VouchersService } from './vouchers.service';
 
 @Module({
-  controllers: [VouchersController, SellerVouchersController, AdminVouchersController],
+  controllers: [
+    VouchersController,
+    SellerVouchersController,
+    AdminVouchersController,
+  ],
   providers: [VouchersService],
   exports: [VouchersService],
 })

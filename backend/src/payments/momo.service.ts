@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac, randomUUID } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import axios from 'axios';
 import { MomoCallbackDto } from './dto/momo-callback.dto';
 
@@ -31,9 +31,13 @@ export class MomoService {
     return createHmac('sha256', secretKey).update(rawSignature).digest('hex');
   }
 
-  async createPayment(orderId: string, amount: number, orderInfo: string) {
+  async createPayment(
+    orderId: string,
+    amount: number,
+    orderInfo: string,
+    requestId: string,
+  ) {
     const cfg = this.config;
-    const requestId = randomUUID();
     const requestType = 'captureWallet';
     const extraData = '';
     const amountStr = String(Math.round(amount));
@@ -68,7 +72,9 @@ export class MomoService {
       signature,
     };
 
-    const res = await axios.post<MomoCreateResponse>(cfg.endpoint, body);
+    const res = await axios.post<MomoCreateResponse>(cfg.endpoint, body, {
+      timeout: 12000,
+    });
     return res.data;
   }
 
@@ -90,6 +96,14 @@ export class MomoService {
       `&transId=${dto.transId ?? ''}`;
 
     const expected = this.sign(rawSignature, cfg.secretKey);
-    return expected === dto.signature;
+    if (
+      dto.partnerCode !== cfg.partnerCode ||
+      !/^[a-fA-F0-9]{64}$/.test(dto.signature)
+    )
+      return false;
+    return timingSafeEqual(
+      Buffer.from(expected, 'hex'),
+      Buffer.from(dto.signature, 'hex'),
+    );
   }
 }

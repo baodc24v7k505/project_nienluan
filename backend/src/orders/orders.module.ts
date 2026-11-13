@@ -8,7 +8,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [VouchersModule, NotificationsModule],
-  controllers: [OrdersController, SellerOrdersController, AdminOrdersController],
+  controllers: [
+    OrdersController,
+    SellerOrdersController,
+    AdminOrdersController,
+  ],
   providers: [OrdersService],
   exports: [OrdersService],
 })

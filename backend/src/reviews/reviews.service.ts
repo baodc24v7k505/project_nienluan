@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ShopOrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -21,7 +27,9 @@ export class ReviewsService {
       throw new ForbiddenException('Bạn không có quyền đánh giá sản phẩm này');
     }
     if (orderItem.shopOrder.status !== ShopOrderStatus.DELIVERED) {
-      throw new BadRequestException('Chỉ có thể đánh giá sau khi đơn hàng đã được giao');
+      throw new BadRequestException(
+        'Chỉ có thể đánh giá sau khi đơn hàng đã được giao',
+      );
     }
 
     const existing = await this.prisma.review.findUnique({

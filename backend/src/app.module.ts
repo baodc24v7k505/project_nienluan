@@ -21,11 +21,33 @@ import { VouchersModule } from './vouchers/vouchers.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { AdvertisementsModule } from './advertisements/advertisements.module';
+import { MediaModule } from './media/media.module';
+import { RateLimitGuard } from './common/guards/rate-limit.guard';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, AuthModule, UsersModule, ShopsModule, CategoriesModule, ProductsModule, CartModule, OrdersModule, AddressesModule, PaymentsModule, ReviewsModule, StatisticsModule, VouchersModule, NotificationsModule, ChatModule, AdvertisementsModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    AuthModule,
+    UsersModule,
+    ShopsModule,
+    CategoriesModule,
+    ProductsModule,
+    CartModule,
+    OrdersModule,
+    AddressesModule,
+    PaymentsModule,
+    ReviewsModule,
+    StatisticsModule,
+    VouchersModule,
+    NotificationsModule,
+    ChatModule,
+    AdvertisementsModule,
+    MediaModule,
+  ],
   controllers: [AppController],
   providers: [
+    { provide: APP_GUARD, useClass: RateLimitGuard },
     AppService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
