@@ -185,7 +185,7 @@ export function AdminAdsPage() {
                 <img
                   src={ad.imageUrl}
                   alt={ad.title}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
                 <span
                   className={`badge absolute left-3 top-3 shadow-sm ${adColors[ad.status]}`}

@@ -116,7 +116,7 @@ export function SellerAdsPage() {
                 <img
                   src={ad.imageUrl}
                   alt={ad.title}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
                 <span
                   className={`badge absolute left-3 top-3 shadow-sm ${adColors[ad.status]}`}
@@ -295,7 +295,7 @@ export function SellerAdsPage() {
                 <img
                   src={imageUrl}
                   alt="Xem trước banner"
-                  className="mt-3 aspect-[2.8/1] w-full rounded-xl bg-slate-50 object-cover"
+                  className="mt-3 aspect-[2.8/1] w-full rounded-xl bg-slate-50 object-contain"
                 />
               )}
               <p className="mt-2 text-[10px] text-slate-400">

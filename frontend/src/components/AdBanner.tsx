@@ -52,7 +52,7 @@ export function AdBanner() {
         </a>
       </div>
       <div
-        className="relative hidden min-h-64 items-center justify-center bg-[#efded2] md:flex"
+        className="relative hidden min-h-64 flex-col items-center justify-center bg-[#efded2] md:flex"
         onMouseEnter={() => setInteracting(true)}
         onMouseLeave={() => setInteracting(false)}
         onFocusCapture={() => setInteracting(true)}
@@ -62,24 +62,26 @@ export function AdBanner() {
       >
         {ad ? (
           <>
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_top_right,#fff7ed,#dec1ad)] pb-20"
-            >
-              <span className="flex h-40 w-40 -rotate-12 items-center justify-center rounded-[40px] bg-white/30 text-7xl text-[#bd7853]">
-                <i className="fas fa-bag-shopping" />
-              </span>
+            <div className="relative min-h-44 w-full flex-1 overflow-hidden bg-white">
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_top_right,#fff7ed,#dec1ad)]"
+              >
+                <span className="flex h-40 w-40 -rotate-12 items-center justify-center rounded-[40px] bg-white/30 text-7xl text-[#bd7853]">
+                  <i className="fas fa-bag-shopping" />
+                </span>
+              </div>
+              <img
+                key={ad.id}
+                src={ad.imageUrl}
+                alt={ad.title}
+                className="absolute inset-0 h-full w-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
             </div>
-            <img
-              key={ad.id}
-              src={ad.imageUrl}
-              alt={ad.title}
-              className="absolute inset-0 h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-            <div className="absolute inset-x-0 bottom-0 bg-slate-950/65 px-6 py-5 text-white">
+            <div className="w-full shrink-0 bg-slate-900 px-6 py-5 text-white">
               <span className="text-[9px] uppercase tracking-widest text-white/60">
                 Quảng cáo · {ad.shop?.name}
               </span>
