@@ -34,7 +34,7 @@ export function ReportControls({
       from: range.from ?? data?.range?.from ?? "",
       to: range.to ?? data?.range?.to ?? "",
     });
-  }, [range.from, range.to, data?.range?.from, data?.range?.to]);
+  }, [range, data?.range?.from, data?.range?.to]);
   function download() {
     if (!data || busy) return;
     const csv =

@@ -148,7 +148,13 @@ test("admin changes report dates and downloads CSV", async ({ page }) => {
   ).toBeVisible();
   await page.getByLabel("Từ ngày", { exact: true }).fill("2026-01-01");
   await page.getByLabel("Đến ngày", { exact: true }).fill("2026-12-31");
+  const initialResponse = page.waitForResponse(
+    (r) =>
+      r.url().includes("/admin/statistics?") &&
+      !new URL(r.url()).searchParams.has("from"),
+  );
   releaseInitial();
+  const initialReport = await (await initialResponse).json();
   await expect(
     page.getByRole("button", { name: "Áp dụng", exact: true }),
   ).toBeEnabled();
@@ -171,6 +177,15 @@ test("admin changes report dates and downloads CSV", async ({ page }) => {
     path: "test-results/admin-report.png",
     fullPage: true,
   });
+  await page.getByRole("button", { name: "14 ngày", exact: true }).click();
+  await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue(
+    initialReport.range.from,
+  );
+  await page.getByLabel("Từ ngày", { exact: true }).fill("2025-01-01");
+  await page.getByRole("button", { name: "14 ngày", exact: true }).click();
+  await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue(
+    initialReport.range.from,
+  );
 });
 test("customer manages profile and address book", async ({ page }) => {
   await login(page, "customer@ecom.local");
