@@ -65,6 +65,36 @@ Nếu MoMo không tạo được liên kết:
 - Phản hồi JSON có `resultCode` được chuẩn hóa thành thông báo kèm mã MoMo. Không đưa chuỗi ký, credentials hoặc toàn bộ lỗi HTTP vào thông báo/log.
 - Kết nối dùng HTTP POST JSON chuẩn, timeout 35 giây (tài liệu MoMo yêu cầu tối thiểu 30 giây). Số tiền giữ đúng số nguyên VND; không tự làm tròn để tránh sai số khi xác nhận callback.
 
+### Kiểm thử MoMo sandbox local
+
+Ngày 17/11/2026 đã tái hiện HTTP 403 từ cổng MoMo khi API gọi từ Render, dù endpoint đúng và cùng cấu hình/số tiền tạo được liên kết từ máy local. Sau bản sửa, Render trả 503 có mã `MOMO_GATEWAY_BLOCKED`, không còn lỗi 500 chung chung; đây là xử lý lỗi, chưa phải khắc phục được quyền kết nối của Render với cổng MoMo. Cần đối chiếu cấu hình merchant và kết nối với MoMo trước khi coi thanh toán online là hoạt động.
+
+Đã kiểm tra local với đơn thật trong database demo: tạo đơn → gọi sandbox → nhận `payUrl` từ `test-payment.momo.vn`, trạng thái vẫn `PENDING`. Sau kiểm tra đã hủy riêng đơn thử và hoàn kho. Không thực hiện giao dịch ví hoặc giả lập ghi nhận `PAID`.
+
+Sau khi cài dependency, migrate và seed database local theo hướng dẫn ở trên, chạy hai terminal:
+
+```powershell
+# Terminal 1: trong backend, dùng DATABASE_URL local trong .env
+npx nest build
+$env:PORT='3101'
+$env:FRONTEND_URL='http://localhost:5173'
+$env:PUBLIC_API_URL='http://localhost:3101/api'
+$env:MOMO_REDIRECT_URL='http://localhost:5173/payment/momo/return'
+$env:MOMO_IPN_URL='http://localhost:3101/api/payments/momo/ipn'
+$env:NODE_ENV='development'
+node dist/src/main.js
+```
+
+```powershell
+# Terminal 2: trong frontend
+$env:VITE_API_URL='http://localhost:3101/api'
+npm run dev -- --host localhost --port 5173 --strictPort
+```
+
+Mở http://localhost:5173, đăng nhập tài khoản demo, chọn SKU → Mua Ngay → Ví MoMo (sandbox). API đọc bộ thông tin sandbox trong `backend/.env`; không dùng khóa production cho môi trường này.
+
+Giới hạn local: MoMo không gọi được IPN tới `localhost`. Việc ghi nhận kết quả phụ thuộc bước trình duyệt quay về website với callback có chữ ký hợp lệ; đóng trình duyệt trước bước này có thể khiến đơn chưa được cập nhật. Để kiểm thử đầy đủ IPN độc lập với trình duyệt, cần URL webhook công khai và cổng MoMo chấp nhận kết nối từ máy chủ. Luồng và timeout tham chiếu: [tài liệu thanh toán thông thường của MoMo](https://developers.momo.vn/v3/vi/docs/payment/api/wallet/onetime/).
+
 Kiểm thử trình duyệt cần API bản nâng cấp và dữ liệu demo. Mặc định test UI dùng API `http://localhost:3100/api` và frontend `http://localhost:5173`.
 
 ```powershell
