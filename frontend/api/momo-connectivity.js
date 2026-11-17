@@ -44,6 +44,7 @@ export default async function handler(request) {
     return json({
       message: 'Connectivity check unavailable', stage,
       errorType: error instanceof Error ? error.name : 'UnknownError',
+      detail: error instanceof Error ? error.message.replaceAll(authorization, '[redacted]').slice(0, 180) : null,
       supportsTimeout: typeof AbortSignal.timeout === 'function',
     }, 503);
   }
