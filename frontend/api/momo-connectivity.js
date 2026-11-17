@@ -19,7 +19,7 @@ export default async function handler(request) {
     const auth = await fetch(`${api}/auth/me`, {
       headers: { Authorization: authorization },
       signal: AbortSignal.timeout(10000),
-      redirect: 'error',
+      redirect: 'manual',
     });
     if (!auth.ok) return json({ message: 'Invalid session' }, 401);
     const user = await auth.json();
@@ -30,7 +30,7 @@ export default async function handler(request) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: '{}',
       signal: AbortSignal.timeout(10000),
-      redirect: 'error',
+      redirect: 'manual',
     });
     let data;
     try { data = await probe.json(); } catch { data = null; }
