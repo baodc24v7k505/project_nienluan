@@ -23,6 +23,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const exceptionResponse =
       exception instanceof HttpException ? exception.getResponse() : null;
+    const code =
+      exceptionResponse &&
+      typeof exceptionResponse === 'object' &&
+      'code' in exceptionResponse &&
+      typeof exceptionResponse.code === 'string'
+        ? exceptionResponse.code
+        : undefined;
 
     let message =
       exceptionResponse &&
@@ -45,6 +52,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       statusCode: status,
       message,
+      ...(code ? { code } : {}),
     });
   }
 }

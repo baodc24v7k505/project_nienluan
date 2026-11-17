@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { ServiceUnavailableException } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { createHmac, randomUUID } from 'crypto';
@@ -367,6 +368,40 @@ describe('Commerce integration with PostgreSQL', () => {
     await call('seller', 'patch', `/seller/orders/${so.id}/status`)
       .send({ status: 'CONFIRMED' })
       .expect(400);
+  });
+  it('keeps the same MoMo attempt after a blocked or uncertain gateway request', async () => {
+    const { order } = await placed('customer', 'MOMO');
+    const mock = jest.spyOn(momo, 'createPayment');
+    mock.mockRejectedValueOnce(
+      new ServiceUnavailableException({
+        message: 'MoMo gateway blocked',
+        code: 'MOMO_GATEWAY_BLOCKED',
+      }),
+    );
+    const first = await call('customer', 'post', '/payments/momo/create')
+      .send({ orderId: order.id })
+      .expect(503);
+    expect(first.body.message).toBe('MoMo gateway blocked');
+    expect(first.body.code).toBe('MOMO_GATEWAY_BLOCKED');
+    const attempt = await db.paymentAttempt.findFirstOrThrow({
+      where: { orderId: order.id },
+    });
+    expect(attempt.resultCode).toBeNull();
+    await call('customer', 'post', '/payments/momo/create')
+      .send({ orderId: order.id })
+      .expect(201);
+    expect(
+      await db.paymentAttempt.count({ where: { orderId: order.id } }),
+    ).toBe(1);
+    expect(mock.mock.calls.at(-1)).toEqual(mock.mock.calls.at(-2));
+    const pending = await db.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
+    expect(pending.paymentStatus).toBe('PENDING');
+    expect(
+      (await db.payment.findUniqueOrThrow({ where: { orderId: order.id } }))
+        .status,
+    ).toBe('PENDING');
   });
   it('accepts numeric signed IPN, rejects wrong amounts and handles duplicate callbacks', async () => {
     const { order, so } = await placed('customer', 'MOMO');

@@ -54,9 +54,16 @@ Tạo database kiểm thử riêng trước lần chạy đầu. Script từ ch�
 
 Các ca integration bao gồm: xác thực và quyền sở hữu; SKU; tranh kho; idempotency; tranh lượt voucher; hủy đồng thời; chọn dòng giỏ/mua ngay; phân bổ hai shop; quyền STAFF/ADMIN; chặn MoMo chưa trả tiền; IPN số/chữ ký/số tiền/callback trùng; hết hạn và callback muộn; COD/vận đơn/đổi trả/hoàn tiền; đối chiếu COD cũ; khoảng ngày; upload ảnh; khóa tài khoản/đổi mật khẩu; chat và phân trang; chu trình danh mục; voucher 0đ; thanh toán trùng và đối chiếu thống kê.
 
-Đợt cập nhật giao diện/quảng cáo bổ sung kiểm thử quyền sở hữu yêu cầu xóa, lý do trống, yêu cầu trùng, hủy/gửi lại, phản hồi từ chối, STAFF bị chặn quyền xóa, ADMIN xóa trực tiếp, banner đã xóa và banner shop đình chỉ bị loại khỏi API công khai. Kết quả local: 26 integration + 1 unit thành công.
+Đợt cập nhật giao diện/quảng cáo bổ sung kiểm thử quyền sở hữu yêu cầu xóa, lý do trống, yêu cầu trùng, hủy/gửi lại, phản hồi từ chối, STAFF bị chặn quyền xóa, ADMIN xóa trực tiếp, banner đã xóa và banner shop đình chỉ bị loại khỏi API công khai. Đợt sửa kết nối MoMo ngày 17/11 bổ sung kiểm thử HTTP 403 không phải JSON, lỗi JSON 4xx, timeout, mạng, cấu hình thiếu, giới hạn số tiền và giữ nguyên mã lần thử khi kết nối chưa xác định kết quả. Tổng: 27 integration + 14 unit.
 
 MoMo được giả lập ở bước tạo payUrl trong integration test; xác thực chữ ký và callback được kiểm tra qua HTTP thật vào ứng dụng. Đây không phải bằng chứng đã thực hiện giao dịch ví MoMo thực tế.
+
+Nếu MoMo không tạo được liên kết:
+
+- `MOMO_GATEWAY_BLOCKED`: cổng trả HTTP 401/403 không có phản hồi JSON hợp lệ. Kiểm tra endpoint và khả năng truy cập từ chính máy chủ chạy API; không đồng nhất lỗi kết nối này với sai chữ ký hoặc thanh toán thất bại.
+- `MOMO_TIMEOUT`/`MOMO_UNREACHABLE`: chưa xác định kết quả khởi tạo. Lần thử sau dùng lại `orderId`/`requestId` của MoMo, không tự tạo danh tính thanh toán mới hoặc đánh dấu đã trả tiền.
+- Phản hồi JSON có `resultCode` được chuẩn hóa thành thông báo kèm mã MoMo. Không đưa chuỗi ký, credentials hoặc toàn bộ lỗi HTTP vào thông báo/log.
+- Kết nối dùng HTTP POST JSON chuẩn, timeout 35 giây (tài liệu MoMo yêu cầu tối thiểu 30 giây). Số tiền giữ đúng số nguyên VND; không tự làm tròn để tránh sai số khi xác nhận callback.
 
 Kiểm thử trình duyệt cần API bản nâng cấp và dữ liệu demo. Mặc định test UI dùng API `http://localhost:3100/api` và frontend `http://localhost:5173`.
 
