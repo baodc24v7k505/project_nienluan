@@ -5,10 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ShopOrderStatus } from '@prisma/client';
+import { Prisma, ShopOrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { ListReviewsQueryDto } from './dto/list-reviews-query.dto';
 
 @Injectable()
 export class ReviewsService {
@@ -39,40 +39,113 @@ export class ReviewsService {
       throw new ConflictException('Bạn đã đánh giá sản phẩm này rồi');
     }
 
-    return this.prisma.review.create({
-      data: {
-        productId: orderItem.productId,
-        customerId,
-        orderItemId: dto.orderItemId,
-        rating: dto.rating,
-        comment: dto.comment,
-      },
-    });
+    const imageIds = dto.imageIds ?? [];
+    if (
+      imageIds.length &&
+      (await this.prisma.mediaAsset.count({
+        where: { id: { in: imageIds }, ownerId: customerId },
+      })) !== imageIds.length
+    ) {
+      throw new BadRequestException(
+        'Chỉ được sử dụng ảnh do chính bạn tải lên',
+      );
+    }
+    try {
+      return await this.prisma.review.create({
+        data: {
+          productId: orderItem.productId,
+          customerId,
+          orderItemId: dto.orderItemId,
+          rating: dto.rating,
+          comment: dto.comment?.trim() || null,
+          images: {
+            create: imageIds.map((assetId, sortOrder) => ({
+              assetId,
+              sortOrder,
+            })),
+          },
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Bạn đã đánh giá sản phẩm này rồi');
+      }
+      throw error;
+    }
   }
 
-  async findByProduct(productId: string, query: PaginationQueryDto) {
+  async findByProduct(
+    productId: string,
+    query: ListReviewsQueryDto,
+    apiUrl: string,
+  ) {
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, status: 'ACTIVE', shop: { status: 'APPROVED' } },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundException('Không tìm thấy sản phẩm');
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
-    const where = { productId };
+    const where: Prisma.ReviewWhereInput = {
+      productId,
+      ...(query.rating ? { rating: query.rating } : {}),
+      ...(query.withImages === 'true' ? { images: { some: {} } } : {}),
+    };
 
-    const [items, total, aggregate] = await Promise.all([
+    const [items, total, groups, withImages] = await Promise.all([
       this.prisma.review.findMany({
         where,
-        include: { customer: { select: { id: true, fullName: true } } },
+        select: {
+          id: true,
+          productId: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+          customer: { select: { fullName: true } },
+          orderItem: { select: { variantSnapshot: true } },
+          images: { select: { assetId: true }, orderBy: { sortOrder: 'asc' } },
+        },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [
+          { createdAt: query.sort === 'oldest' ? 'asc' : 'desc' },
+          { id: 'desc' },
+        ],
       }),
       this.prisma.review.count({ where }),
-      this.prisma.review.aggregate({ where, _avg: { rating: true } }),
+      this.prisma.review.groupBy({
+        by: ['rating'],
+        where: { productId },
+        _count: { _all: true },
+      }),
+      this.prisma.review.count({ where: { productId, images: { some: {} } } }),
     ]);
+    const distribution = [5, 4, 3, 2, 1].map((rating) => ({
+      rating,
+      count: groups.find((g) => g.rating === rating)?._count._all ?? 0,
+    }));
+    const reviewCount = distribution.reduce((sum, g) => sum + g.count, 0);
+    const avgRating = reviewCount
+      ? distribution.reduce((sum, g) => sum + g.rating * g.count, 0) /
+        reviewCount
+      : 0;
 
     return {
-      items,
+      items: items.map(({ images, orderItem, ...item }) => ({
+        ...item,
+        variantName: orderItem.variantSnapshot,
+        imageUrls: images.map(
+          (image) => `${apiUrl.replace(/\/$/, '')}/media/${image.assetId}`,
+        ),
+      })),
       total,
       page,
       pageSize,
-      avgRating: aggregate._avg.rating ?? 0,
+      avgRating,
+      summary: { total: reviewCount, avgRating, withImages, distribution },
     };
   }
 }

@@ -566,6 +566,170 @@ describe('Commerce integration with PostgreSQL', () => {
       .expect(200)
       .expect('Content-Type', /image\/png/);
   });
+  it('enforces delivered purchase ownership, image ownership and review validation', async () => {
+    const { p, so } = await placed();
+    const orderItemId = so.orderItems[0].id;
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN0sAAAAASUVORK5CYII=',
+      'base64',
+    );
+    const uploaded = await call('customer', 'post', '/media')
+      .attach('file', png, { filename: 'review.png', contentType: 'image/png' })
+      .expect(201);
+    const foreign = await call('other', 'post', '/media')
+      .attach('file', png, { filename: 'other.png', contentType: 'image/png' })
+      .expect(201);
+    await call('other', 'post', '/reviews')
+      .send({ orderItemId, rating: 5 })
+      .expect(403);
+    await call('customer', 'post', '/reviews')
+      .send({ orderItemId, rating: 5 })
+      .expect(400);
+    await call('seller', 'patch', `/seller/orders/${so.id}/status`)
+      .send({ status: 'CONFIRMED' })
+      .expect(200);
+    await call('seller', 'patch', `/seller/orders/${so.id}/shipping`)
+      .send({ carrier: 'Demo', trackingCode: randomUUID() })
+      .expect(200);
+    await call('seller', 'patch', `/seller/orders/${so.id}/status`)
+      .send({ status: 'SHIPPING' })
+      .expect(200);
+    await call('seller', 'patch', `/seller/orders/${so.id}/status`)
+      .send({ status: 'DELIVERED' })
+      .expect(200);
+    for (const extra of [
+      { imageIds: [foreign.body.id] },
+      { imageIds: [randomUUID()] },
+      { imageIds: [uploaded.body.id, uploaded.body.id] },
+      { imageIds: Array.from({ length: 6 }, () => randomUUID()) },
+      { imageIds: ['https://example.com/image.jpg'] },
+      { rating: 0 },
+      { comment: 'x'.repeat(2001) },
+    ])
+      await call('customer', 'post', '/reviews')
+        .send({ orderItemId, rating: 5, ...extra })
+        .expect(400);
+    const attempts = await Promise.all(
+      [1, 2].map(() =>
+        call('customer', 'post', '/reviews').send({
+          orderItemId,
+          rating: 5,
+          comment: '  Ảnh thực tế sau nhận hàng  ',
+          imageIds: [uploaded.body.id],
+        }),
+      ),
+    );
+    expect(attempts.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(await db.review.count({ where: { orderItemId } })).toBe(1);
+    const listed = await request(app.getHttpServer())
+      .get(`/api/products/${p.id}/reviews?withImages=true`)
+      .expect(200);
+    expect(listed.body.total).toBe(1);
+    expect(listed.body.items[0].imageUrls).toHaveLength(1);
+    expect(listed.body.items[0].comment).toBe('Ảnh thực tế sau nhận hàng');
+    expect(listed.body.items[0].variantName).toBe('Màu đen / M');
+    expect(listed.body.items[0].orderItemId).toBeUndefined();
+    expect(listed.body.items[0].customerId).toBeUndefined();
+    expect(listed.body.summary.withImages).toBe(1);
+    await request(app.getHttpServer())
+      .get(new URL(listed.body.items[0].imageUrls[0] as string).pathname)
+      .expect(200)
+      .expect('Content-Type', /image\/png/);
+    const detail = await call(
+      'customer',
+      'get',
+      `/orders/${so.orderId}`,
+    ).expect(200);
+    expect(detail.body.shopOrders[0].orderItems[0].reviews[0].rating).toBe(5);
+  });
+  it('filters review pages while preserving the overall rating distribution', async () => {
+    const p = await product();
+    for (const rating of [5, 3]) {
+      const order = await call('customer', 'post', '/orders')
+        .send(payload('customer', p))
+        .expect(201);
+      const so = order.body.shopOrders[0];
+      await db.shopOrder.update({
+        where: { id: so.id },
+        data: { status: 'DELIVERED', deliveredAt: new Date() },
+      });
+      await call('customer', 'post', '/reviews')
+        .send({ orderItemId: so.orderItems[0].id, rating })
+        .expect(201);
+    }
+    const filtered = await request(app.getHttpServer())
+      .get(`/api/products/${p.id}/reviews?rating=5&pageSize=1`)
+      .expect(200);
+    expect(filtered.body.total).toBe(1);
+    expect(filtered.body.items[0].rating).toBe(5);
+    expect(filtered.body.summary.total).toBe(2);
+    expect(filtered.body.avgRating).toBe(4);
+    expect(filtered.body.summary.distribution).toEqual([
+      { rating: 5, count: 1 },
+      { rating: 4, count: 0 },
+      { rating: 3, count: 1 },
+      { rating: 2, count: 0 },
+      { rating: 1, count: 0 },
+    ]);
+    const images = await request(app.getHttpServer())
+      .get(`/api/products/${p.id}/reviews?withImages=true`)
+      .expect(200);
+    expect(images.body.total).toBe(0);
+    expect(images.body.summary.total).toBe(2);
+    await request(app.getHttpServer())
+      .get(`/api/products/${p.id}/reviews?withImages=yes`)
+      .expect(400);
+    await request(app.getHttpServer())
+      .get(`/api/products/${p.id}/reviews?rating=6`)
+      .expect(400);
+    await db.product.update({
+      where: { id: p.id },
+      data: { status: 'HIDDEN' },
+    });
+    await request(app.getHttpServer())
+      .get(`/api/products/${p.id}/reviews`)
+      .expect(404);
+  });
+  it('keeps wishlists private, idempotent and limited to available products', async () => {
+    const p = await product();
+    await request(app.getHttpServer()).get('/api/wishlist').expect(401);
+    for (const role of ['seller', 'admin', 'staff'])
+      await call(role, 'post', `/wishlist/${p.id}`).expect(403);
+    const saved = await Promise.all(
+      [1, 2].map(() => call('customer', 'post', `/wishlist/${p.id}`)),
+    );
+    expect(saved.map((r) => r.status)).toEqual([201, 201]);
+    expect(
+      await db.wishlistItem.count({
+        where: { userId: users.customer.id, productId: p.id },
+      }),
+    ).toBe(1);
+    const own = await call('customer', 'get', '/wishlist').expect(200);
+    expect(own.body.items.map((v: { id: string }) => v.id)).toContain(p.id);
+    const other = await call('other', 'get', '/wishlist/ids').expect(200);
+    expect(other.body.ids).not.toContain(p.id);
+    await call('other', 'delete', `/wishlist/${p.id}`).expect(200);
+    expect((await call('customer', 'get', '/wishlist/ids')).body.ids).toContain(
+      p.id,
+    );
+    await db.product.update({
+      where: { id: p.id },
+      data: { status: 'HIDDEN' },
+    });
+    expect(
+      (await call('customer', 'get', '/wishlist')).body.items.map(
+        (v: { id: string }) => v.id,
+      ),
+    ).not.toContain(p.id);
+    await call('customer', 'post', `/wishlist/${p.id}`).expect(404);
+    for (const unused of [1, 2]) {
+      void unused;
+      await call('customer', 'delete', `/wishlist/${p.id}`).expect(200);
+    }
+    expect(
+      (await call('customer', 'get', '/wishlist/ids')).body.ids,
+    ).not.toContain(p.id);
+  });
   it('rejects already-issued access tokens when the user is banned', async () => {
     await call('admin', 'patch', `/admin/users/${users.other.id}/status`)
       .send({ status: 'BANNED' })

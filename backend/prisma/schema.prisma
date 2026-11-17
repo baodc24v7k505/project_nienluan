@@ -76,6 +76,7 @@ model User {
   conversations      Conversation[]
   messages           Message[]
   notifications      Notification[]
+  wishlist           WishlistItem[]
 
   @@map("users")
 }
@@ -146,6 +147,7 @@ model Product {
   orderItems OrderItem[]
   reviews    Review[]
   variants   ProductVariant[]
+  wishlist   WishlistItem[]
 
   @@index([shopId])
   @@index([categoryId])
@@ -311,6 +313,7 @@ model Review {
   product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   customer  User      @relation(fields: [customerId], references: [id], onDelete: Cascade)
   orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  images    ReviewImage[]
 
   @@index([productId])
   @@map("reviews")
@@ -553,6 +556,30 @@ model MediaAsset {
   mimeType String
   data Bytes
   createdAt DateTime @default(now())
+  reviewImages ReviewImage[]
   @@index([ownerId])
   @@map("media_assets")
+}
+
+model ReviewImage {
+  reviewId String
+  assetId String
+  sortOrder Int @default(0)
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@id([reviewId, assetId])
+  @@index([assetId])
+  @@map("review_images")
+}
+
+model WishlistItem {
+  userId String
+  productId String
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@id([userId, productId])
+  @@index([userId, createdAt])
+  @@index([productId])
+  @@map("wishlist_items")
 }

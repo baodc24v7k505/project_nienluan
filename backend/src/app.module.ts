@@ -23,6 +23,7 @@ import { ChatModule } from './chat/chat.module';
 import { AdvertisementsModule } from './advertisements/advertisements.module';
 import { MediaModule } from './media/media.module';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
+import { WishlistModule } from './wishlist/wishlist.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { RateLimitGuard } from './common/guards/rate-limit.guard';
     ChatModule,
     AdvertisementsModule,
     MediaModule,
+    WishlistModule,
   ],
   controllers: [AppController],
   providers: [

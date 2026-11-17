@@ -30,7 +30,12 @@ import type { AuthUser } from '../auth/types/auth-user.type';
 
 const DETAILS = {
   shop: { select: { id: true, name: true } },
-  orderItems: { include: { product: { select: { id: true, name: true } } } },
+  orderItems: {
+    include: {
+      product: { select: { id: true, name: true } },
+      reviews: { select: { id: true, rating: true } },
+    },
+  },
   history: { orderBy: { createdAt: 'asc' as const } },
   returnRequest: true,
   refunds: true,

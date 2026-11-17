@@ -56,6 +56,7 @@ class MediaController {
       select: { id: true },
     });
     return {
+      id: asset.id,
       url: `${process.env.PUBLIC_API_URL ?? `${req.protocol}://${req.get('host')}/api`}/media/${asset.id}`,
     };
   }
