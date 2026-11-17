@@ -296,7 +296,7 @@ git push -u origin main
    - `DATABASE_URL` — chuỗi kết nối Neon ở bước 2
    - `FRONTEND_URL` — để tạm `https://placeholder.vercel.app`, sẽ sửa lại ở bước 5 sau khi có domain Vercel thật
    - `MOMO_REDIRECT_URL` — tạm `https://placeholder.vercel.app/payment/momo/return`
-   - `MOMO_IPN_URL` — tạm `https://ecom-backend.onrender.com/api/payments/momo/ipn` (đoán trước tên service, Render cho phép đặt tên cố định)
+   - `MOMO_IPN_URL` — `https://<domain-backend-thực-tế>/api/payments/momo/ipn`; cập nhật ngay khi Render cấp URL, không đoán domain theo tên service
 4. Bấm **Apply** — Render sẽ build và chạy `prisma migrate deploy` tự động để tạo bảng trên Neon
 5. Sau khi chạy xong, chạy seed dữ liệu mẫu 1 lần từ máy bạn, trỏ vào DB Neon:
    ```bash
@@ -304,7 +304,7 @@ git push -u origin main
    DATABASE_URL="<chuỗi-kết-nối-Neon>" npx prisma db seed
    ```
    (PowerShell: `$env:DATABASE_URL="<chuỗi-kết-nối-Neon>"; npx prisma db seed`)
-6. Ghi lại địa chỉ backend Render cấp, dạng `https://ecom-backend.onrender.com`
+6. Ghi lại địa chỉ backend Render cấp và cập nhật `MOMO_IPN_URL` theo đúng địa chỉ đó. Bản đang triển khai dùng `https://ecom-backend-g2m7.onrender.com`, vì vậy IPN là `https://ecom-backend-g2m7.onrender.com/api/payments/momo/ipn`.
 
 **Nếu không dùng Blueprint:** tạo **New → Web Service** thủ công, trỏ `Root Directory` = `backend`, Build Command = `npm install && npx prisma generate && npm run build`, Start Command = `npx prisma migrate deploy && npm run start:prod`, rồi tự thêm từng biến môi trường theo bảng ở mục 7.
 
@@ -313,7 +313,7 @@ git push -u origin main
 1. Đăng nhập [vercel.com](https://vercel.com) bằng GitHub
 2. **Add New → Project** → chọn repo → **Root Directory** chọn `frontend`
 3. Vercel tự nhận diện Vite, không cần sửa Build Command (`npm run build`) / Output Directory (`dist`)
-4. Thêm biến môi trường: `VITE_API_URL` = `https://ecom-backend.onrender.com/api` (địa chỉ backend ở bước 3)
+4. Thêm biến môi trường: `VITE_API_URL` = `<địa-chỉ-backend-thực-tế>/api` (địa chỉ backend ở bước 3)
 5. Deploy — Vercel cấp domain dạng `https://<ten-project>.vercel.app`
 
 ### Bước 5 — Nối lại 2 chiều
@@ -321,7 +321,7 @@ git push -u origin main
 Quay lại Render, sửa 3 biến môi trường cho đúng domain Vercel thật:
 - `FRONTEND_URL` = `https://<ten-project>.vercel.app`
 - `MOMO_REDIRECT_URL` = `https://<ten-project>.vercel.app/payment/momo/return`
-- `MOMO_IPN_URL` giữ nguyên (trỏ về backend)
+- `MOMO_IPN_URL` phải bằng `<địa-chỉ-backend-thực-tế>/api/payments/momo/ipn`, kiểm tra lại cả hậu tố domain Render
 
 Lưu lại → Render tự redeploy với biến mới.
 

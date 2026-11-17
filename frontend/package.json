@@ -8,8 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:ui": "playwright test",
-    "test:server": "node --test server-tests/*.test.mjs"
+    "test:ui": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

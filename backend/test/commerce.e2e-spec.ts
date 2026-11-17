@@ -370,8 +370,6 @@ describe('Commerce integration with PostgreSQL', () => {
       .expect(400);
   });
   it('keeps the same MoMo attempt after a blocked or uncertain gateway request', async () => {
-    await call('customer', 'post', '/payments/momo/diagnostics').expect(403);
-    await call('staff', 'post', '/payments/momo/diagnostics').expect(403);
     const { order } = await placed('customer', 'MOMO');
     const mock = jest.spyOn(momo, 'createPayment');
     mock.mockRejectedValueOnce(

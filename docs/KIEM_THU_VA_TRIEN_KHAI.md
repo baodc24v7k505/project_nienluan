@@ -69,6 +69,8 @@ Nếu MoMo không tạo được liên kết:
 
 Ngày 17/11/2026 đã tái hiện HTTP 403 từ cổng MoMo khi API gọi từ Render, dù endpoint đúng và cùng cấu hình/số tiền tạo được liên kết từ máy local. Sau bản sửa, Render trả 503 có mã `MOMO_GATEWAY_BLOCKED`, không còn lỗi 500 chung chung; đây là xử lý lỗi, chưa phải khắc phục được quyền kết nối của Render với cổng MoMo. Cần đối chiếu cấu hình merchant và kết nối với MoMo trước khi coi thanh toán online là hoạt động.
 
+Đã đối chiếu cả payload bản cũ, Node 22/24 ở local, Render và Vercel Node/Edge; xem [biên bản kiểm tra kết nối](MOMO_KET_NOI_20261117.md). Đã sửa IPN trên Render về đúng `https://ecom-backend-g2m7.onrender.com/api/payments/momo/ipn`; lỗi tạo liên kết HTTP 403 vẫn còn sau thay đổi.
+
 Đã kiểm tra local với đơn thật trong database demo: tạo đơn → gọi sandbox → nhận `payUrl` từ `test-payment.momo.vn`, trạng thái vẫn `PENDING`. Sau kiểm tra đã hủy riêng đơn thử và hoàn kho. Không thực hiện giao dịch ví hoặc giả lập ghi nhận `PAID`.
 
 Sau khi cài dependency, migrate và seed database local theo hướng dẫn ở trên, chạy hai terminal:
