@@ -1,41 +1,44 @@
 // Read-only connectivity probe: only ADMIN may invoke it. It submits no
 // credentials, amount or order to MoMo and cannot create a payment.
-export default async function handler(request, response) {
-  response.setHeader('Cache-Control', 'no-store');
+export const config = { runtime: 'edge' };
+
+export default async function handler(request) {
+  const json = (body, status = 200, headers = {}) => Response.json(body, {
+    status, headers: { 'Cache-Control': 'no-store', ...headers },
+  });
   if (request.method !== 'POST') {
-    response.setHeader('Allow', 'POST');
-    return response.status(405).json({ message: 'Method not allowed' });
+    return json({ message: 'Method not allowed' }, 405, { Allow: 'POST' });
   }
-  const authorization = request.headers.authorization;
+  const authorization = request.headers.get('authorization');
   if (typeof authorization !== 'string' || !authorization.startsWith('Bearer ')) {
-    return response.status(401).json({ message: 'Authentication required' });
+    return json({ message: 'Authentication required' }, 401);
   }
   const api = (process.env.VITE_API_URL ?? 'https://ecom-backend-g2m7.onrender.com/api').replace(/\/$/, '');
   try {
     const auth = await fetch(`${api}/auth/me`, {
       headers: { Authorization: authorization },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(10000),
       redirect: 'error',
     });
-    if (!auth.ok) return response.status(401).json({ message: 'Invalid session' });
+    if (!auth.ok) return json({ message: 'Invalid session' }, 401);
     const user = await auth.json();
-    if (user.role !== 'ADMIN') return response.status(403).json({ message: 'Admin only' });
+    if (user.role !== 'ADMIN') return json({ message: 'Admin only' }, 403);
     const probe = await fetch('https://test-payment.momo.vn/v2/gateway/api/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: '{}',
-      signal: AbortSignal.timeout(35000),
+      signal: AbortSignal.timeout(10000),
       redirect: 'error',
     });
     let data;
     try { data = await probe.json(); } catch { data = null; }
-    return response.status(200).json({
+    return json({
       httpStatus: probe.status,
       server: probe.headers.get('server'),
       contentType: probe.headers.get('content-type'),
       resultCode: typeof data?.resultCode === 'number' ? data.resultCode : null,
     });
   } catch {
-    return response.status(503).json({ message: 'Connectivity check unavailable' });
+    return json({ message: 'Connectivity check unavailable' }, 503);
   }
 }

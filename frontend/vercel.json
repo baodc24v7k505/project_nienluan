@@ -1,4 +1,3 @@
 {
-  "functions": { "api/momo-connectivity.js": { "maxDuration": 60 } },
   "routes": [{ "handle": "filesystem" }, { "src": "/.*", "dest": "/index.html" }]
 }
