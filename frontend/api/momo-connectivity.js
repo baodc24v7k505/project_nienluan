@@ -14,6 +14,7 @@ export default async function handler(request) {
     return json({ message: 'Authentication required' }, 401);
   }
   const api = (process.env.VITE_API_URL ?? 'https://ecom-backend-g2m7.onrender.com/api').replace(/\/$/, '');
+  let stage = 'authentication';
   try {
     const auth = await fetch(`${api}/auth/me`, {
       headers: { Authorization: authorization },
@@ -23,6 +24,7 @@ export default async function handler(request) {
     if (!auth.ok) return json({ message: 'Invalid session' }, 401);
     const user = await auth.json();
     if (user.role !== 'ADMIN') return json({ message: 'Admin only' }, 403);
+    stage = 'gateway';
     const probe = await fetch('https://test-payment.momo.vn/v2/gateway/api/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -38,7 +40,11 @@ export default async function handler(request) {
       contentType: probe.headers.get('content-type'),
       resultCode: typeof data?.resultCode === 'number' ? data.resultCode : null,
     });
-  } catch {
-    return json({ message: 'Connectivity check unavailable' }, 503);
+  } catch (error) {
+    return json({
+      message: 'Connectivity check unavailable', stage,
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+      supportsTimeout: typeof AbortSignal.timeout === 'function',
+    }, 503);
   }
 }
