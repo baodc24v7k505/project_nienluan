@@ -5,7 +5,10 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { lookup } from 'node:dns/promises';
+import { request as httpsRequest } from 'node:https';
+import axios from 'axios';
 import { MomoCallbackDto } from './dto/momo-callback.dto';
 
 interface MomoCreateResponse {
@@ -38,6 +41,180 @@ export class MomoService {
 
   private sign(rawSignature: string, secretKey: string): string {
     return createHmac('sha256', secretKey).update(rawSignature).digest('hex');
+  }
+
+  async diagnoseSandbox() {
+    const cfg = this.config;
+    const target = new URL(cfg.endpoint);
+    if (
+      target.origin !== 'https://test-payment.momo.vn' ||
+      target.pathname !== '/v2/gateway/api/create'
+    )
+      throw new BadRequestException(
+        'Chẩn đoán chỉ dùng cho endpoint sandbox MoMo chính thức',
+      );
+    const addresses = await lookup(target.hostname, { all: true });
+    const probes: {
+      mode: string;
+      httpStatus?: number;
+      server?: string;
+      contentType?: string;
+      resultCode?: number;
+      hasPayUrl?: boolean;
+      remoteAddress?: string;
+      error?: string;
+    }[] = [];
+    for (const mode of [
+      'legacy-axios',
+      'current-fetch',
+      'current-https-ipv4',
+    ]) {
+      const baseId = randomUUID(),
+        requestId = randomUUID();
+      const orderId =
+        mode === 'legacy-axios'
+          ? baseId
+          : `${baseId}-${randomUUID().slice(0, 8)}`;
+      const orderInfo =
+        mode === 'legacy-axios'
+          ? `Thanh toan don hang ${baseId}`
+          : `Thanh toan don ${baseId}`;
+      const amount = '10000',
+        extraData = '',
+        requestType = 'captureWallet';
+      const raw = `accessKey=${cfg.accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${cfg.ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${cfg.partnerCode}&redirectUrl=${cfg.redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
+      const body = {
+        partnerCode: cfg.partnerCode,
+        partnerName:
+          mode === 'legacy-axios' ? 'Sàn TMĐT Niên Luận' : 'Sàn TMĐT Tiểu Luận',
+        storeId: 'NienLuanStore',
+        requestId,
+        amount,
+        orderId,
+        orderInfo,
+        redirectUrl: cfg.redirectUrl,
+        ipnUrl: cfg.ipnUrl,
+        lang: 'vi',
+        extraData,
+        requestType,
+        signature: this.sign(raw, cfg.secretKey),
+      };
+      try {
+        let status: number,
+          text: string,
+          server: string | undefined,
+          contentType: string | undefined,
+          remoteAddress: string | undefined;
+        if (mode === 'legacy-axios') {
+          const res = await axios.post<unknown>(cfg.endpoint, body, {
+            timeout: 35000,
+            validateStatus: () => true,
+            responseType: 'text',
+          });
+          status = res.status;
+          text =
+            typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+          const serverHeader: unknown = res.headers.server,
+            typeHeader: unknown = res.headers['content-type'];
+          server = typeof serverHeader === 'string' ? serverHeader : undefined;
+          contentType = typeof typeHeader === 'string' ? typeHeader : undefined;
+        } else if (mode === 'current-fetch') {
+          const res = await fetch(cfg.endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(35000),
+            redirect: 'error',
+          });
+          status = res.status;
+          text = await res.text();
+          server = res.headers.get('server') ?? undefined;
+          contentType = res.headers.get('content-type') ?? undefined;
+        } else {
+          const payload = JSON.stringify(body);
+          const res = await new Promise<{
+            status: number;
+            text: string;
+            server?: string;
+            contentType?: string;
+            remoteAddress?: string;
+          }>((resolve, reject) => {
+            const req = httpsRequest(
+              cfg.endpoint,
+              {
+                method: 'POST',
+                family: 4,
+                headers: {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                  'Content-Length': Buffer.byteLength(payload),
+                },
+                timeout: 35000,
+              },
+              (response) => {
+                let output = '';
+                response.setEncoding('utf8');
+                response.on('data', (chunk: string) => {
+                  output += chunk;
+                });
+                response.on('error', reject);
+                response.on('end', () =>
+                  resolve({
+                    status: response.statusCode ?? 0,
+                    text: output,
+                    server:
+                      typeof response.headers.server === 'string'
+                        ? response.headers.server
+                        : undefined,
+                    contentType: response.headers['content-type'],
+                    remoteAddress: response.socket?.remoteAddress,
+                  }),
+                );
+              },
+            );
+            req.on('error', reject);
+            req.on('timeout', () => req.destroy(new Error('timeout')));
+            req.end(payload);
+          });
+          status = res.status;
+          text = res.text;
+          server = res.server;
+          contentType = res.contentType;
+          remoteAddress = res.remoteAddress;
+        }
+        let data: unknown;
+        try {
+          data = JSON.parse(text) as unknown;
+        } catch {
+          data = null;
+        }
+        const result = this.readResponse(data);
+        probes.push({
+          mode,
+          httpStatus: status,
+          server,
+          contentType,
+          remoteAddress,
+          resultCode: result?.resultCode,
+          hasPayUrl: !!result?.payUrl,
+        });
+      } catch {
+        probes.push({ mode, error: 'transport-error' });
+      }
+    }
+    return {
+      node: process.version,
+      endpoint: target.origin + target.pathname,
+      partnerCode: cfg.partnerCode,
+      redirectUrl:
+        new URL(cfg.redirectUrl).origin + new URL(cfg.redirectUrl).pathname,
+      ipnUrl: new URL(cfg.ipnUrl).origin + new URL(cfg.ipnUrl).pathname,
+      addresses,
+      probes,
+    };
   }
 
   async createPayment(
