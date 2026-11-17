@@ -193,7 +193,7 @@ export function AdBanner() {
               key={ad.id}
               src={ad.imageUrl}
               alt=""
-              className="relative h-full w-full object-cover"
+              className="relative h-full w-full object-contain"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
               }}

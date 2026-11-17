@@ -100,6 +100,15 @@ Frontend Vercel:
 - VITE_API_URL=https://your-backend.onrender.com/api.
 - Sau build phải redeploy frontend để biến VITE_API_URL mới có hiệu lực.
 
+Domain production cập nhật ngày 17/11/2026:
+
+- Frontend: https://ecom-tieuluan.vercel.app (project Vercel: `ecom-tieuluan`).
+- https://ecom-nienluan.vercel.app chuyển hướng sang domain mới.
+- API giữ nguyên https://ecom-backend-g2m7.onrender.com/api.
+- Trên Render, `FRONTEND_URL=https://ecom-tieuluan.vercel.app` áp dụng cho CORS của HTTP và socket chat.
+- `MOMO_REDIRECT_URL=https://ecom-tieuluan.vercel.app/payment/momo/return`; `MOMO_IPN_URL` vẫn dùng domain backend.
+- Sau khi sửa biến môi trường Render, lưu và redeploy backend; kiểm tra đăng nhập từ domain mới để phát hiện sai CORS trước khi demo.
+
 Các migration đều bổ sung và backfill SKU mặc định, ảnh chụp đơn, phân bổ giảm giá, lịch sử và khoản hoàn cũ cần đối chiếu. Đã kiểm tra migration trên bản sao dữ liệu local trước khi áp dụng database local đang dùng. Bản sao lưu trước nâng cấp nằm tại `.local/backups/ecom_db_before_upgrade_20261113.dump`, không được commit.
 
 Trước migration production nên tạo snapshot/backup ở nhà cung cấp PostgreSQL. Không chạy migrate reset hoặc db push để thay cho migrate deploy. Khi đã áp dụng schema mới, rollback cần phối hợp bản code và database/snapshot; chỉ redeploy code cũ có thể không tương thích giỏ hàng theo SKU.
