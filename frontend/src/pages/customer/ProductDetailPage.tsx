@@ -8,7 +8,10 @@ import { getOrCreateConversation } from "../../api/chat";
 import { getPublicShop, listShopVouchers } from "../../api/shops";
 import { useAuthStore } from "../../store/auth.store";
 import { formatVnd, formatVoucherDiscount } from "../../lib/format";
-import { Pagination } from "../../components/Pagination";
+import { ProductReviews } from "../../components/ProductReviews";
+import { WishlistButton } from "../../components/WishlistButton";
+import { RelatedProducts } from "../../components/RelatedProducts";
+import { ImageViewer } from "../../components/ImageViewer";
 export function ProductDetailPage() {
   const { id } = useParams();
   return <ProductView key={id} id={id ?? ""} />;
@@ -18,10 +21,10 @@ function ProductView({ id }: { id: string }) {
     location = useLocation(),
     qc = useQueryClient(),
     user = useAuthStore((s) => s.user);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const [activeImage, setActiveImage] = useState(0),
     [variantId, setVariantId] = useState(""),
     [quantity, setQuantity] = useState(1),
-    [reviewPage, setReviewPage] = useState(1),
     [expanded, setExpanded] = useState(false),
     [tab, setTab] = useState<"description" | "reviews">("description");
   const {
@@ -44,8 +47,8 @@ function ProductView({ id }: { id: string }) {
     enabled: !!product,
   });
   const { data: reviews } = useQuery({
-    queryKey: ["product-reviews", id, reviewPage],
-    queryFn: () => listProductReviews(id, reviewPage),
+    queryKey: ["product-reviews", id, "summary"],
+    queryFn: () => listProductReviews(id, 1, { pageSize: 1 }),
     enabled: !!id,
   });
   const variants = product?.variants ?? [],
@@ -118,7 +121,12 @@ function ProductView({ id }: { id: string }) {
       </nav>
       <section className="surface grid gap-7 p-4 md:grid-cols-[1.05fr_1fr] md:gap-10 md:p-7 lg:gap-14">
         <div className="min-w-0">
-          <div className="relative aspect-square overflow-hidden rounded-2xl bg-slate-50">
+          <button
+            type="button"
+            aria-label="Phóng to ảnh sản phẩm"
+            onClick={() => setViewerOpen(true)}
+            className="relative block aspect-square w-full overflow-hidden rounded-2xl bg-slate-50"
+          >
             <img
               src={image}
               alt={product.name}
@@ -131,7 +139,7 @@ function ProductView({ id }: { id: string }) {
             <span className="absolute left-4 top-4 rounded-lg bg-white/90 px-3 py-1.5 text-[10px] font-medium text-slate-500">
               {product.category?.name ?? "Sản phẩm"}
             </span>
-          </div>
+          </button>
           {product.images.length > 1 && (
             <div className="mt-3 flex gap-2 overflow-x-auto">
               {product.images.map((img, i) => (
@@ -348,6 +356,9 @@ function ProductView({ id }: { id: string }) {
                 "Không thực hiện được thao tác"}
             </p>
           )}
+          <div className="mt-4">
+            <WishlistButton productId={id} />
+          </div>
           <div className="mt-6 space-y-3 rounded-2xl bg-slate-50 p-4">
             <div className="flex gap-3">
               <i
@@ -464,72 +475,22 @@ function ProductView({ id }: { id: string }) {
           </div>
         ) : (
           <div role="tabpanel">
-            {reviews && reviews.total > 0 ? (
-              <>
-                <div className="mb-6 flex items-center gap-5 rounded-2xl bg-amber-50/60 p-5">
-                  <span className="text-3xl font-semibold text-slate-800">
-                    {reviews.avgRating.toFixed(1)}
-                    <span className="text-base font-normal text-slate-400">
-                      {" "}
-                      / 5
-                    </span>
-                  </span>
-                  <div>
-                    <p className="text-amber-500">
-                      {"★".repeat(Math.round(reviews.avgRating))}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Từ {reviews.total} lượt mua đã được đánh giá
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-5">
-                  {reviews.items.map((r) => (
-                    <article key={r.id} className="flex gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
-                        {r.customer.fullName[0]}
-                      </span>
-                      <div>
-                        <p className="text-xs font-semibold">
-                          {r.customer.fullName}
-                        </p>
-                        <p className="mt-1 text-xs text-amber-500">
-                          {"★".repeat(r.rating)}
-                          <span className="ml-3 text-[10px] text-slate-400">
-                            {new Date(r.createdAt).toLocaleDateString("vi-VN")}
-                          </span>
-                        </p>
-                        <p className="mt-2 text-sm leading-6 text-slate-600">
-                          {r.comment || "Khách hàng không để lại nhận xét."}
-                        </p>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                <Pagination
-                  page={reviewPage}
-                  pageSize={reviews.pageSize}
-                  total={reviews.total}
-                  onPageChange={setReviewPage}
-                />
-              </>
-            ) : (
-              <div className="py-8 text-center">
-                <i
-                  className="far fa-star text-3xl text-slate-200"
-                  aria-hidden="true"
-                />
-                <p className="mt-3 text-sm text-slate-500">
-                  Chưa có đánh giá cho sản phẩm này
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Khách hàng có thể đánh giá sau khi nhận hàng.
-                </p>
-              </div>
-            )}
+            <ProductReviews productId={id} />
           </div>
         )}
       </section>
+      <RelatedProducts product={product} />
+      {viewerOpen && (
+        <ImageViewer
+          images={
+            product.images.length
+              ? product.images.map((image) => image.url)
+              : ["/favicon.svg"]
+          }
+          initialIndex={activeImage}
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
     </div>
   );
 }

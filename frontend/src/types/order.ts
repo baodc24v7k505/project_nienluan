@@ -47,6 +47,7 @@ export interface Cart {
 }
 
 export interface OrderItemLine {
+  reviews?: { id: string; rating: number }[];
   variantSnapshot: string | null;
   skuSnapshot: string | null;
   id: string;

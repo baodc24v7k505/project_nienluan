@@ -10,6 +10,8 @@ import { OrderFulfillment } from "../../components/OrderFulfillment";
 import { createMomoPayment } from "../../api/payments";
 import { OrderRefunds } from "../../components/OrderRefunds";
 
+import { ReviewComposer } from "../../components/ReviewComposer";
+
 const CANCELLABLE: ShopOrderStatus[] = ["PENDING", "CONFIRMED"];
 
 const cancelledByLabel: Record<string, string> = {
@@ -123,14 +125,17 @@ export function OrderDetailPage() {
               </span>
             </div>
             {so.orderItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex justify-between text-sm text-slate-600"
-              >
-                <span>
-                  {item.nameSnapshot} · {item.variantSnapshot} × {item.quantity}
-                </span>
-                <span>{formatVnd(Number(item.unitPrice) * item.quantity)}</span>
+              <div key={item.id} className="my-2 rounded-xl bg-slate-50 p-3">
+                <div className="flex flex-wrap justify-between gap-2 text-sm text-slate-600">
+                  <span>
+                    {item.nameSnapshot} · {item.variantSnapshot} ×{" "}
+                    {item.quantity}
+                  </span>
+                  <span>
+                    {formatVnd(Number(item.unitPrice) * item.quantity)}
+                  </span>
+                </div>
+                {so.status === "DELIVERED" && <ReviewComposer item={item} />}
               </div>
             ))}
             <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">

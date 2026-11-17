@@ -58,6 +58,10 @@ Các ca integration bao gồm: xác thực và quyền sở hữu; SKU; tranh kh
 
 MoMo được giả lập ở bước tạo payUrl trong integration test; xác thực chữ ký và callback được kiểm tra qua HTTP thật vào ứng dụng. Đây không phải bằng chứng đã thực hiện giao dịch ví MoMo thực tế.
 
+Đợt nâng cấp trải nghiệm ngày 17/11/2026 đã đạt **14 unit, 30 integration và 11 ca Playwright**. Ba ca integration mới kiểm tra ảnh đánh giá/quyền sở hữu/gửi đồng thời, thống kê sao độc lập bộ lọc, danh sách yêu thích riêng tư và idempotent. Ba ca UI mới kiểm tra yêu thích sau reload, đánh giá từ đơn đã giao với tải/bỏ/xem ảnh và giữ bộ lọc qua Back/reload. Kiểm thử local dùng database riêng `ecom_ui_upgrade_test`; không đưa các kịch bản đặt/giao đơn và nhận xét vào production.
+
+Trước migration local đã sao lưu `.local/backups/ecom_db_before_reviews_20261117.dump`. Migration `20261117050000_review_images_wishlist` chỉ bổ sung ReviewImage/WishlistItem, khóa ngoại và index. Backend đã được triển khai trước để giao diện cũ vẫn đọc được API; giao diện mới triển khai sau khi backend sẵn sàng.
+
 Nếu MoMo không tạo được liên kết:
 
 - `MOMO_GATEWAY_BLOCKED`: cổng trả HTTP 401/403 không có phản hồi JSON hợp lệ. Kiểm tra endpoint và khả năng truy cập từ chính máy chủ chạy API; không đồng nhất lỗi kết nối này với sai chữ ký hoặc thanh toán thất bại.

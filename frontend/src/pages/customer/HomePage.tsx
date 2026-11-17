@@ -11,16 +11,32 @@ const PAGE_SIZE = 12;
 export function HomePage() {
   const [params, setParams] = useSearchParams();
   const search = params.get("search") ?? "";
-  const [categoryId, setCategoryId] = useState(""),
-    [page, setPage] = useState(1);
-  const [sort, setSort] = useState<"newest" | "price_asc" | "price_desc">(
-    "newest",
-  );
-  const [priceDraft, setPriceDraft] = useState({ min: "", max: "" }),
-    [prices, setPrices] = useState({ min: "", max: "" });
+  const categoryId = params.get("categoryId") ?? "";
+  const rawPage = Number(params.get("page") ?? 1);
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+  const rawSort = params.get("sort");
+  const sort =
+    rawSort === "price_asc" || rawSort === "price_desc" ? rawSort : "newest";
+  const min = params.get("minPrice") ?? "",
+    max = params.get("maxPrice") ?? "";
+  const prices = { min, max };
+  const [priceDraft, setPriceDraft] = useState(prices),
+    [priceError, setPriceError] = useState("");
   useEffect(() => {
-    setPage(1);
-  }, [search]);
+    setPriceDraft({ min, max });
+  }, [min, max]);
+  function updateFilters(values: Record<string, string>) {
+    const next = new URLSearchParams(params);
+    next.delete("page");
+    for (const [key, value] of Object.entries(values)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    setParams(next);
+  }
+  function setPage(value: number) {
+    updateFilters({ page: value > 1 ? String(value) : "" });
+  }
   const { data: categories } = useQuery({
     queryKey: ["categories"],
     queryFn: listCategories,
@@ -41,17 +57,15 @@ export function HomePage() {
   });
   const categoryName = categories?.find((c) => c.id === categoryId)?.name;
   function clearFilters() {
-    setCategoryId("");
-    setPrices({ min: "", max: "" });
     setPriceDraft({ min: "", max: "" });
-    setSort("newest");
+    setPriceError("");
     setParams({});
-    setPage(1);
   }
   const filtered = !!(search || categoryId || prices.min || prices.max);
+  const CatalogueHeading = filtered ? "h1" : "h2";
   return (
     <div>
-      {!search && <AdBanner />}
+      {!filtered && <AdBanner />}
       <section className="mb-9" aria-label="Danh mục sản phẩm">
         <div className="mb-4 flex items-end justify-between">
           <div>
@@ -67,8 +81,7 @@ export function HomePage() {
             aria-label="Tất cả danh mục"
             aria-pressed={!categoryId}
             onClick={() => {
-              setCategoryId("");
-              setPage(1);
+              updateFilters({ categoryId: "" });
             }}
             className={`flex w-25 shrink-0 flex-col items-center gap-3 rounded-2xl px-3 py-4 transition ${!categoryId ? "bg-brand-bg text-brand" : "bg-white text-slate-500 hover:bg-slate-100"}`}
           >
@@ -81,8 +94,7 @@ export function HomePage() {
               aria-label={c.name}
               aria-pressed={categoryId === c.id}
               onClick={() => {
-                setCategoryId(c.id);
-                setPage(1);
+                updateFilters({ categoryId: c.id });
               }}
               className={`flex w-29 shrink-0 flex-col items-center gap-3 rounded-2xl px-3 py-4 transition ${categoryId === c.id ? "bg-brand-bg text-brand" : "bg-white text-slate-500 hover:bg-slate-100"}`}
             >
@@ -99,11 +111,11 @@ export function HomePage() {
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="eyebrow mb-1.5">Dành cho bạn</p>
-            <h2 className="text-2xl font-semibold tracking-tight">
+            <CatalogueHeading className="text-2xl font-semibold tracking-tight">
               {search
                 ? `Kết quả cho “${search}”`
                 : (categoryName ?? "Khám phá sản phẩm")}
-            </h2>
+            </CatalogueHeading>
             <p className="mt-1.5 text-xs text-slate-400">
               {data
                 ? `${data.total} sản phẩm${categoryName ? ` trong ${categoryName}` : " từ các gian hàng"}`
@@ -126,8 +138,7 @@ export function HomePage() {
               aria-label="Sắp xếp sản phẩm"
               value={sort}
               onChange={(e) => {
-                setSort(e.target.value as typeof sort);
-                setPage(1);
+                updateFilters({ sort: e.target.value });
               }}
               className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700"
             >
@@ -140,8 +151,19 @@ export function HomePage() {
             className="flex flex-wrap items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              setPrices(priceDraft);
-              setPage(1);
+              if (
+                priceDraft.min &&
+                priceDraft.max &&
+                Number(priceDraft.min) > Number(priceDraft.max)
+              ) {
+                setPriceError("Giá từ phải nhỏ hơn hoặc bằng giá đến.");
+                return;
+              }
+              setPriceError("");
+              updateFilters({
+                minPrice: priceDraft.min,
+                maxPrice: priceDraft.max,
+              });
             }}
           >
             <span className="text-xs text-slate-400">Khoảng giá</span>
@@ -172,6 +194,11 @@ export function HomePage() {
               Lọc giá
             </button>
           </form>
+          {priceError && (
+            <p role="alert" className="w-full text-xs text-red-600">
+              {priceError}
+            </p>
+          )}
           {isFetching && !isLoading && (
             <span role="status" className="ml-auto text-xs text-slate-400">
               Đang cập nhật…

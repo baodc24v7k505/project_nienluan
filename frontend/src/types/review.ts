@@ -1,12 +1,12 @@
 export interface Review {
   id: string;
   productId: string;
-  customerId: string;
-  orderItemId: string;
   rating: number;
   comment: string | null;
   createdAt: string;
-  customer: { id: string; fullName: string };
+  customer: { fullName: string };
+  variantName: string | null;
+  imageUrls: string[];
 }
 
 export interface ReviewsResult {
@@ -15,4 +15,10 @@ export interface ReviewsResult {
   page: number;
   pageSize: number;
   avgRating: number;
+  summary: {
+    total: number;
+    avgRating: number;
+    withImages: number;
+    distribution: { rating: number; count: number }[];
+  };
 }

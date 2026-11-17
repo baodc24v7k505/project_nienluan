@@ -87,6 +87,15 @@ export function RootLayout() {
             <HeaderSearch />
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-4 text-lg text-slate-600">
+            {user?.role === "CUSTOMER" && (
+              <Link
+                to="/wishlist"
+                aria-label="Sản phẩm yêu thích"
+                className="hover:text-rose-500"
+              >
+                <i className="far fa-heart" aria-hidden="true" />
+              </Link>
+            )}
             {user ? (
               <>
                 <Link

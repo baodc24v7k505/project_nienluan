@@ -136,6 +136,11 @@ const AccountPage = lazy(() =>
 );
 
 const queryClient = new QueryClient();
+const WishlistPage = lazy(() =>
+  import("./pages/customer/WishlistPage").then((m) => ({
+    default: m.WishlistPage,
+  })),
+);
 
 function App() {
   return (
@@ -144,9 +149,7 @@ function App() {
         <AuthBootstrap>
           <Suspense
             fallback={
-              <p className="p-6 text-center text-slate-500">
-                ?ang t?i trang...
-              </p>
+              <p className="p-6 text-center text-slate-500">Đang tải trang…</p>
             }
           >
             <Routes>
@@ -156,6 +159,14 @@ function App() {
                 <Route path="shop/:id" element={<ShopPage />} />
                 <Route path="login" element={<LoginPage />} />
                 <Route path="register" element={<RegisterPage />} />
+                <Route
+                  path="wishlist"
+                  element={
+                    <RequireAuth roles={["CUSTOMER"]}>
+                      <WishlistPage />
+                    </RequireAuth>
+                  }
+                />
                 <Route
                   path="account"
                   element={

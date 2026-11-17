@@ -2,6 +2,8 @@
 
 > Bản nâng cấp tiểu luận ngày 13/11/2026: xem [chức năng và dữ liệu demo](docs/PHIEN_BAN_TIEU_LUAN.md) cùng [hướng dẫn kiểm thử/redeploy](docs/KIEM_THU_VA_TRIEN_KHAI.md). Các mô tả bên dưới là hướng dẫn của bản niên luận; ưu tiên hai tài liệu mới khi có khác biệt.
 
+> Ngày 17/11/2026 bổ sung đánh giá có ảnh, yêu thích, bộ lọc đánh giá, xem ảnh lớn và giữ bộ lọc danh mục khi quay lại. [Báo cáo tiểu luận](docs/bao-cao/README.md) có bản nguồn, bản HTML và PDF, cùng sơ đồ và minh chứng kiểm thử.
+
 Hệ thống thương mại điện tử phong cách Shopee với 3 vai trò:
 
 - **Khách hàng**: tìm kiếm, mua hàng, thanh toán trực tuyến, chat với shop/hỗ trợ, nhận thông báo real-time

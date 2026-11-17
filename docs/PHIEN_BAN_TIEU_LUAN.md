@@ -26,6 +26,16 @@ Ngày thực hiện: 13/11/2026. Tài liệu này mô tả bản triển khai sa
 
 Các chức năng kế thừa như đăng ký, shop, danh mục, review, quảng cáo và thông báo vẫn nằm trong source. Không xem việc build thành công là bằng chứng đã kiểm thử hết mọi màn hình cũ.
 
+## Bổ sung trải nghiệm người mua ngày 17/11/2026
+
+- Đánh giá từ cả danh sách và chi tiết đơn đã giao; tối đa 5 ảnh JPEG/PNG/WebP, 2MB/ảnh; nhận xét tối đa 2.000 ký tự. Backend chỉ nhận mã ảnh tồn tại thuộc người mua, không nhận URL ảnh tùy ý. Database giữ liên kết và thứ tự ảnh; gửi đồng thời cùng dòng trả 201/409, không tạo trùng.
+- Đọc đánh giá có phân bố sao, lọc sao/có ảnh, sắp xếp thời gian, phân trang, phân loại đã mua và xem ảnh lớn. Điểm trung bình luôn tính trên toàn bộ đánh giá sản phẩm, độc lập với bộ lọc. Phản hồi công khai bỏ mã đơn/dòng đơn và mã khách nội bộ.
+- Yêu thích lưu theo tài khoản CUSTOMER, tối đa 500 món, thao tác lưu/bỏ không tạo trùng và không tác động khách khác. Thẻ sản phẩm có trái tim riêng với liên kết; danh sách tạm ẩn sản phẩm/shop không còn khả dụng.
+- Danh mục lưu tìm kiếm, danh mục, giá, sắp xếp và trang trên URL để giữ lựa chọn khi Back/reload. Khi đang lọc, ẩn phần quảng bá để tập trung vào kết quả. Trang sản phẩm có xem ảnh lớn và sản phẩm cùng danh mục hoặc cùng shop; đây là chọn theo điều kiện, không phải gợi ý AI.
+- Bộ kiểm chứng cập nhật: 14 unit, 30 integration, 11 ca Playwright trên desktop/mobile. Có [báo cáo tiểu luận và bản nguồn](bao-cao/README.md) theo hệ thống thực tế.
+
+Migration cần áp dụng trước giao diện mới: `20261117050000_review_images_wishlist`. Ảnh tải lên nhưng bị bỏ khỏi bản nháp chưa có tác vụ tự dọn; đánh giá hiện chưa có sửa/xóa hoặc kiểm duyệt nội dung.
+
 ## Quy tắc nghiệp vụ cần mô tả trong báo cáo
 
 1. Một lần checkout tạo một Order và nhiều ShopOrder. Mỗi shop nhận phần giảm giá phân bổ riêng; tổng các phần đúng bằng giảm giá của Order, kể cả làm tròn.
@@ -58,7 +68,7 @@ npm run db:seed:demo
 
 ## Các phần còn có thể phát triển
 
-Chưa tích hợp hãng vận chuyển, tự động hoàn tiền, trả từng OrderItem, email quên mật khẩu, phí/đối soát seller, nhật ký quản trị toàn hệ thống, wishlist, flash sale hoặc gợi ý cá nhân hóa. Xuất báo cáo hiện là CSV; XLSX/PDF và OpenAPI có thể bổ sung ở đợt sau. Tác vụ hết hạn chạy trong tiến trình API mỗi phút, chưa dùng worker hàng đợi riêng.
+Chưa tích hợp hãng vận chuyển, tự động hoàn tiền, trả từng OrderItem, email quên mật khẩu, phí/đối soát seller, nhật ký quản trị toàn hệ thống, flash sale hoặc gợi ý cá nhân hóa. Xuất dữ liệu báo cáo quản trị hiện là CSV; XLSX/PDF và OpenAPI có thể bổ sung ở đợt sau. Tác vụ hết hạn chạy trong tiến trình API mỗi phút, chưa dùng worker hàng đợi riêng.
 
 ## Khung trình bày đóng góp mới
 
